@@ -1,1 +1,1 @@
-music player writte in rust for learning
+music player written in rust (work in progress)
