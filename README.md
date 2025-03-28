@@ -1,1 +1,1 @@
-music player written in rust (work in progress)
+vim inspired music player written in rust (work in progress)
