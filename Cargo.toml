@@ -4,9 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-terminal_size = "0.4.2"
-console = "0.15.11"
 crossterm = "0.28.1"
 walkdir = "2.5.0"
 fuzzy-matcher = "0.3.7"
-sort_alogorithms = "0.1.1"
+
