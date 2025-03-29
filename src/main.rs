@@ -1,13 +1,24 @@
-use crossterm::ExecutableCommand;
 use crossterm::cursor::{MoveTo, MoveToColumn, MoveToRow};
 use crossterm::event::{Event, KeyCode, KeyModifiers, read};
 use crossterm::style::{ResetColor, SetAttribute, SetBackgroundColor};
 use crossterm::terminal::{self, ClearType};
+use crossterm::{ExecutableCommand, cursor};
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
-use std::io::{self, Write};
-use std::path::PathBuf;
+use rodio::cpal::default_host;
+use rodio::source::SamplesConverter;
+use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
+use std::sync::Mutex;
+
+use std::fs::File;
+use std::io::{self, BufReader, Cursor, Read, Write};
+use std::path::{Path, PathBuf};
+use std::result::Result;
 use std::string::String;
+use std::sync::Arc;
+use std::thread::{JoinHandle, Thread, sleep, spawn};
+use std::time::Duration;
+use std::{result, thread};
 use walkdir::{self, WalkDir};
 
 #[derive(Clone)]
@@ -16,33 +27,67 @@ struct SongEntry {
     score: i64,
 }
 
+struct Player {
+    current_song: SongEntry,
+    sink: Sink,
+}
+
+impl Player {
+    fn init() -> Player {
+        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+        let sink = Sink::try_new(&stream_handle).unwrap();
+        let entry = SongEntry {
+            file: PathBuf::new(),
+            score: 0,
+        };
+        return Player {
+            current_song: entry,
+            sink: sink,
+        };
+    }
+    fn play_song(&mut self) {
+        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+        let sink = Sink::try_new(&stream_handle).unwrap();
+
+        let file = BufReader::new(File::open(&self.current_song.file).unwrap());
+        let source = Decoder::new(file).unwrap();
+
+        sink.append(source);
+        while (!sink.empty()) {
+            println!("waiting for audio to end");
+            sleep(Duration::new(1, 0));
+        }
+        sink.sleep_until_end();
+    }
+}
+
+// clear the entire terminal
 fn t_clear_all() {
     io::stdout()
         .execute(terminal::Clear(ClearType::All))
         .unwrap();
 }
-
+// clear the whole line
 fn t_clear_line() {
     io::stdout()
         .execute(terminal::Clear(ClearType::CurrentLine))
         .unwrap();
 }
-
+// move to the very top (top left)
 fn t_mv_start() {
     io::stdout().execute(MoveTo(0, 0)).unwrap();
 }
-
+// move to the very bottom
 fn t_mv_end() {
     let t_sz = terminal::size().unwrap();
     io::stdout().execute(MoveTo(0, t_sz.1)).unwrap();
 }
-
+// move to the start of the current line
 fn t_mv_sol() {
     io::stdout().execute(MoveToColumn(0)).unwrap();
 }
-
+// change the lines style for the song we are hovering over
 fn t_bg_gray() {
-    io::stdout().flush().unwrap();
     io::stdout()
         .execute(SetBackgroundColor(crossterm::style::Color::DarkGrey))
         .unwrap();
@@ -50,11 +95,20 @@ fn t_bg_gray() {
         .execute(SetAttribute(crossterm::style::Attribute::Bold))
         .unwrap();
 }
+// reset the terminals styling
 fn t_bg_reset() {
-    io::stdout().flush().unwrap();
     io::stdout().execute(ResetColor).unwrap();
+}
 
+fn t_flush() {
     io::stdout().flush().unwrap();
+}
+
+fn t_cursor_show() {
+    io::stdout().execute(cursor::Show).unwrap();
+}
+fn t_cursor_hide() {
+    io::stdout().execute(cursor::Hide).unwrap();
 }
 
 fn run_cmd(cmd: &String) -> Result<&'static str, &'static str> {
@@ -126,10 +180,8 @@ fn walkdir(query: &mut String) -> Vec<SongEntry> {
         }
     }
     song_entries = sort_entries(song_entries.clone());
-
     let cpy = song_entries.clone();
     song_entries = bubble_sort(cpy);
-
     song_entries
 }
 
@@ -139,16 +191,15 @@ fn song_entries_print(s_e_vec: &[SongEntry], index: usize) {
         t_mv_sol();
         io::stdout().flush().unwrap();
         if entry.score > 0 {
-            t_bg_reset();
             let name = entry.file.file_name().unwrap().to_string_lossy();
-            let prnt = if name.len() > t_sz.0 as usize {
-                name.split_at(t_sz.0 as usize - 2).0
+            let prnt = if name.len() > t_sz.0 as usize - 2 {
+                name.split_at(t_sz.0 as usize - 4).0
             } else {
                 &name
             };
             if i == s_e_vec.len() - index + 1 {
                 t_bg_gray();
-
+                t_flush();
                 print!("* {}", prnt);
                 t_bg_reset();
                 println!();
@@ -157,20 +208,19 @@ fn song_entries_print(s_e_vec: &[SongEntry], index: usize) {
             }
         }
     }
-    // io::stdout().flush().unwrap();
 }
 
-fn play_song(s_e_vec: &[SongEntry], index: usize) {
-    t_clear_all();
-    println!(
-        "{}",
-        s_e_vec
-            .get(s_e_vec.len() - index + 1)
-            .unwrap()
-            .file
-            .to_str()
-            .unwrap()
-    );
+fn get_song(s_e_vec: &[SongEntry], index: usize) -> SongEntry {
+    let song = s_e_vec.get(s_e_vec.len() - index + 1).unwrap();
+    return song.clone();
+}
+
+fn display_query(query: &String) {
+    t_flush();
+    t_cursor_hide();
+    t_mv_sol();
+    print!("/{query}");
+    t_mv_end();
 }
 
 fn main() {
@@ -182,6 +232,8 @@ fn main() {
     let mut index = 0;
     let mut search_results = Vec::new();
     let mut track_mode: bool = false;
+
+    let mut player = Player::init();
 
     t_mv_start();
     t_clear_all();
@@ -195,6 +247,7 @@ fn main() {
                 break 'input;
             } else if key_event.code == KeyCode::Esc {
                 if cmd_mode || search_mode || track_mode {
+                    t_cursor_show();
                     search_mode = false;
                     cmd_mode = false;
                     track_mode = false;
@@ -204,11 +257,16 @@ fn main() {
                 }
             } else if key_event.code == KeyCode::Enter {
                 if search_mode {
+                    t_cursor_show();
                     track_mode = true;
-                    index = 0;
+                    index = 2;
                     search_mode = false;
                     song_entries_print(&search_results, index);
-                    t_mv_end();
+                    display_query(&search_str);
+                    io::stdout()
+                        .execute(MoveToRow(t_sz.1 - index as u16))
+                        .unwrap();
+                    t_mv_sol();
                 } else if cmd_mode {
                     cmd_mode = false;
                     let res = run_cmd(&cmd_str);
@@ -228,7 +286,11 @@ fn main() {
                     print!("{}", cmd_str);
                     cmd_str.clear();
                 } else if track_mode {
-                    play_song(&search_results, index);
+                    let song = get_song(&search_results, index);
+
+                    player.current_song = song;
+                    player.play_song();
+
                     track_mode = false;
                 }
             } else if key_event.code == KeyCode::Char(':') {
@@ -249,14 +311,14 @@ fn main() {
                     search_str.clear();
                 }
             } else if key_event.code == KeyCode::Char('j') {
-                if track_mode && index > 0 {
+                if track_mode && index > 2 {
                     index -= 1;
                     song_entries_print(&search_results, index);
+                    display_query(&search_str);
 
                     io::stdout()
                         .execute(MoveToRow(t_sz.1 - index as u16))
                         .unwrap();
-
                     t_mv_sol();
                     io::stdout().flush().unwrap();
                 }
@@ -264,10 +326,11 @@ fn main() {
                 if track_mode && index < t_sz.1 as usize {
                     index += 1;
                     song_entries_print(&search_results, index);
+                    display_query(&search_str);
+
                     io::stdout()
                         .execute(MoveToRow(t_sz.1 - index as u16))
                         .unwrap();
-
                     t_mv_sol();
                     io::stdout().flush().unwrap();
                 }
@@ -292,7 +355,9 @@ fn main() {
                         cmd_str.clear();
                     } else {
                         search_str.pop();
-                        walkdir(&mut search_str);
+                        search_results = walkdir(&mut search_str);
+                        song_entries_print(&search_results, index);
+                        display_query(&search_str);
                         t_mv_sol();
                         io::stdout().flush().unwrap();
                     }
@@ -309,6 +374,8 @@ fn main() {
                     search_str.push(chr);
                     if !search_str.is_empty() {
                         search_results = walkdir(&mut search_str);
+                        song_entries_print(&search_results, index);
+                        display_query(&search_str);
                     }
                 }
             }

@@ -7,4 +7,5 @@ edition = "2024"
 crossterm = "0.28.1"
 walkdir = "2.5.0"
 fuzzy-matcher = "0.3.7"
+rodio = "0.20.1"
 
