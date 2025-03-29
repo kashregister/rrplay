@@ -9,11 +9,15 @@ example:
 /home/kr24/Music
 ```
 # navigation:
-
+### modes
 : - command mode \
 / - search mode \
 enter - track mode 
 
+### actions
+p - pause
+
+### searching
 fuzzy search allows you to quikcly find what you are looking for whether its an album, a track, an artist or a mix of everything since it uses the full paths
 
 quit it like you would quit vim, 
