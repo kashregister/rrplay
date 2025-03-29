@@ -20,96 +20,15 @@ use std::thread::{JoinHandle, Thread, sleep, spawn};
 use std::time::Duration;
 use std::{result, thread};
 use walkdir::{self, WalkDir};
+// Import audio player struct
+mod player;
+use player::Player;
 
-#[derive(Clone)]
-struct SongEntry {
-    file: PathBuf,
-    score: i64,
-}
+mod search_utils;
+use search_utils::*;
 
-struct Player {
-    current_song: SongEntry,
-    sink: Sink,
-}
-
-impl Player {
-    fn init() -> Player {
-        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
-        let sink = Sink::try_new(&stream_handle).unwrap();
-        let entry = SongEntry {
-            file: PathBuf::new(),
-            score: 0,
-        };
-        return Player {
-            current_song: entry,
-            sink: sink,
-        };
-    }
-    fn play_song(&mut self) {
-        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-        let sink = Sink::try_new(&stream_handle).unwrap();
-
-        let file = BufReader::new(File::open(&self.current_song.file).unwrap());
-        let source = Decoder::new(file).unwrap();
-
-        sink.append(source);
-        while (!sink.empty()) {
-            println!("waiting for audio to end");
-            sleep(Duration::new(1, 0));
-        }
-        sink.sleep_until_end();
-    }
-}
-
-// clear the entire terminal
-fn t_clear_all() {
-    io::stdout()
-        .execute(terminal::Clear(ClearType::All))
-        .unwrap();
-}
-// clear the whole line
-fn t_clear_line() {
-    io::stdout()
-        .execute(terminal::Clear(ClearType::CurrentLine))
-        .unwrap();
-}
-// move to the very top (top left)
-fn t_mv_start() {
-    io::stdout().execute(MoveTo(0, 0)).unwrap();
-}
-// move to the very bottom
-fn t_mv_end() {
-    let t_sz = terminal::size().unwrap();
-    io::stdout().execute(MoveTo(0, t_sz.1)).unwrap();
-}
-// move to the start of the current line
-fn t_mv_sol() {
-    io::stdout().execute(MoveToColumn(0)).unwrap();
-}
-// change the lines style for the song we are hovering over
-fn t_bg_gray() {
-    io::stdout()
-        .execute(SetBackgroundColor(crossterm::style::Color::DarkGrey))
-        .unwrap();
-    io::stdout()
-        .execute(SetAttribute(crossterm::style::Attribute::Bold))
-        .unwrap();
-}
-// reset the terminals styling
-fn t_bg_reset() {
-    io::stdout().execute(ResetColor).unwrap();
-}
-
-fn t_flush() {
-    io::stdout().flush().unwrap();
-}
-
-fn t_cursor_show() {
-    io::stdout().execute(cursor::Show).unwrap();
-}
-fn t_cursor_hide() {
-    io::stdout().execute(cursor::Hide).unwrap();
-}
+mod term_utils;
+use term_utils::*;
 
 fn run_cmd(cmd: &String) -> Result<&'static str, &'static str> {
     if cmd.eq(":q") {
@@ -119,100 +38,6 @@ fn run_cmd(cmd: &String) -> Result<&'static str, &'static str> {
     } else {
         Err("Wrong syntax")
     }
-}
-
-fn sort_entries(mut song_entries: Vec<SongEntry>) -> Vec<SongEntry> {
-    for (i, item) in song_entries.clone().iter().enumerate() {
-        if let Some(next_item) = song_entries.get(i + 1) {
-            if item.score > next_item.score {
-                song_entries.swap(i, i + 1);
-            }
-        }
-    }
-    song_entries.reverse();
-    song_entries
-}
-
-fn bubble_sort(mut vec: Vec<SongEntry>) -> Vec<SongEntry> {
-    let mut n = vec.len();
-    loop {
-        let mut swapped = false;
-
-        for i in 0..n - 1 {
-            if vec[i].score > vec[i + 1].score {
-                vec.swap(i, i + 1);
-                swapped = true;
-            }
-        }
-        if !swapped {
-            break;
-        }
-        n -= 1;
-    }
-    vec
-}
-
-fn walkdir(query: &mut String) -> Vec<SongEntry> {
-    if query.starts_with('/') {
-        query.remove(0);
-    }
-    t_clear_all();
-    let path = "/mnt/disk_new/Music Library/";
-    let file_types = [
-        "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
-    ];
-    let mut song_entries = Vec::new();
-    for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-        if let Some(ext) = entry.path().extension() {
-            if file_types.contains(&ext.to_str().unwrap()) {
-                let tmp: SongEntry = SongEntry {
-                    file: (entry.path().to_owned()),
-                    score: (0),
-                };
-                song_entries.push(tmp);
-            }
-        }
-    }
-    let matcher = SkimMatcherV2::default();
-    for entry in &mut song_entries {
-        if let Some(score) = matcher.fuzzy_match(entry.file.to_str().unwrap(), query) {
-            entry.score = score;
-        }
-    }
-    song_entries = sort_entries(song_entries.clone());
-    let cpy = song_entries.clone();
-    song_entries = bubble_sort(cpy);
-    song_entries
-}
-
-fn song_entries_print(s_e_vec: &[SongEntry], index: usize) {
-    let t_sz = terminal::size().unwrap();
-    for (i, entry) in s_e_vec.iter().enumerate() {
-        t_mv_sol();
-        io::stdout().flush().unwrap();
-        if entry.score > 0 {
-            let name = entry.file.file_name().unwrap().to_string_lossy();
-            let prnt = if name.len() > t_sz.0 as usize - 2 {
-                name.split_at(t_sz.0 as usize - 4).0
-            } else {
-                &name
-            };
-            if i == s_e_vec.len() - index + 1 {
-                t_bg_gray();
-                t_flush();
-                print!("* {}", prnt);
-                t_bg_reset();
-                println!();
-            } else {
-                println!("{prnt}");
-            }
-        }
-    }
-}
-
-fn get_song(s_e_vec: &[SongEntry], index: usize) -> SongEntry {
-    let song = s_e_vec.get(s_e_vec.len() - index + 1).unwrap();
-    return song.clone();
 }
 
 fn display_query(query: &String) {
@@ -242,6 +67,19 @@ fn main() {
         let event = read().unwrap();
         let t_sz = terminal::size().unwrap();
         if let Event::Key(key_event) = event {
+            if key_event.code == KeyCode::Char('p') {
+                if !cmd_mode || !search_mode {
+                    // Get the current state
+                    let current_playing = player.is_playing();
+
+                    // Toggle the state based on current value
+                    if current_playing {
+                        player.pause_song();
+                    } else {
+                        player.resume_song();
+                    }
+                }
+            }
             if key_event.code == KeyCode::Char('c') && key_event.modifiers == KeyModifiers::CONTROL
             {
                 break 'input;
@@ -287,11 +125,11 @@ fn main() {
                     cmd_str.clear();
                 } else if track_mode {
                     let song = get_song(&search_results, index);
-
+                    player.skip_song(true);
                     player.current_song = song;
                     player.play_song();
 
-                    track_mode = false;
+                    // track_mode = false;
                 }
             } else if key_event.code == KeyCode::Char(':') {
                 if !cmd_mode {
@@ -385,6 +223,6 @@ fn main() {
     terminal::disable_raw_mode().unwrap();
     t_clear_all();
     t_mv_start();
-
+    t_cursor_show();
     t_bg_reset();
 }
