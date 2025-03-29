@@ -65,6 +65,14 @@ fn check_config_dir() -> bool {
     }
 }
 
+fn info_print() {
+    print!("/ search\n\r");
+    print!(": cmd mode\n\r");
+    print!("enter - track mode\n");
+    t_mv_sol();
+    print!("p - pause\n\r");
+}
+
 fn main() {
     let mut search_mode: bool = false;
     let mut search_str: String = String::new();
@@ -125,15 +133,17 @@ fn main() {
         let event = read().unwrap();
         let t_sz = terminal::size().unwrap();
         if let Event::Key(key_event) = event {
-            if key_event.code == KeyCode::Char('p') && (!cmd_mode || !search_mode) {
-                // Get the current state
-                let current_playing = player.is_playing();
+            if key_event.code == KeyCode::Char('p') {
+                if track_mode {
+                    // Get the current state
+                    let current_playing = player.is_playing();
 
-                // Toggle the state based on current value
-                if current_playing {
-                    player.pause_song();
-                } else {
-                    player.resume_song();
+                    // Toggle the state based on current value
+                    if current_playing {
+                        player.pause_song();
+                    } else {
+                        player.resume_song();
+                    }
                 }
             }
             if key_event.code == KeyCode::Char('c') && key_event.modifiers == KeyModifiers::CONTROL
@@ -147,11 +157,12 @@ fn main() {
                     track_mode = false;
                     t_mv_start();
                     cmd_str.clear();
+                    t_clear_all();
+                    info_print();
                     io::stdout().flush().unwrap();
                 }
             } else if key_event.code == KeyCode::Enter {
                 if search_mode {
-                    t_cursor_show();
                     track_mode = true;
                     index = 2;
                     search_mode = false;
@@ -196,6 +207,11 @@ fn main() {
                     cmd_str.clear();
                 }
             } else if key_event.code == KeyCode::Char('/') {
+                if track_mode {
+                    cmd_mode = false;
+                    track_mode = false;
+                    search_mode = true;
+                }
                 if !search_mode {
                     t_clear_all();
                     io::stdout().execute(MoveTo(0, t_sz.1)).unwrap();
@@ -248,6 +264,7 @@ fn main() {
                         t_mv_start();
                         cmd_str.clear();
                     } else {
+                        search_mode = true;
                         search_str.pop();
                         search_results = walkdir(&mut search_str, path.clone());
                         song_entries_print(&search_results, index);
