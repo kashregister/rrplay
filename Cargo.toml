@@ -9,6 +9,12 @@ crossterm = "0.28.1"
 walkdir = "2.5.0"
 fuzzy-matcher = "0.3.7"
 rodio = { version ="0.20.1", features = ["symphonia-all"] }
+dirs = "6.0.0"
 
+
+[profile.release]
+strip = true  # Automatically strip symbols from the binary.
+lto = true
+codegen-units = 1
 
 

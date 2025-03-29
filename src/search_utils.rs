@@ -1,6 +1,5 @@
 use crossterm::terminal;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
-use std::io::{self, stdout};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
@@ -43,12 +42,12 @@ pub fn bubble_sort(mut vec: Vec<SongEntry>) -> Vec<SongEntry> {
     vec
 }
 
-pub fn walkdir(query: &mut String) -> Vec<SongEntry> {
+pub fn walkdir(query: &mut String, path: String) -> Vec<SongEntry> {
     if query.starts_with('/') {
         query.remove(0);
     }
     t_clear_all();
-    let path = "/mnt/disk_new/Music Library/";
+
     let file_types = [
         "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
     ];
@@ -104,5 +103,5 @@ pub fn song_entries_print(s_e_vec: &[SongEntry], index: usize) {
 
 pub fn get_song(s_e_vec: &[SongEntry], index: usize) -> SongEntry {
     let song = s_e_vec.get(s_e_vec.len() - index + 1).unwrap();
-    return song.clone();
+    song.clone()
 }

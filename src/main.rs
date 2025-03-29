@@ -1,25 +1,12 @@
-use crossterm::cursor::{MoveTo, MoveToColumn, MoveToRow};
+use crossterm::ExecutableCommand;
+use crossterm::cursor::{MoveTo, MoveToRow};
 use crossterm::event::{Event, KeyCode, KeyModifiers, read};
-use crossterm::style::{ResetColor, SetAttribute, SetBackgroundColor};
-use crossterm::terminal::{self, ClearType};
-use crossterm::{ExecutableCommand, cursor};
-use fuzzy_matcher::FuzzyMatcher;
-use fuzzy_matcher::skim::SkimMatcherV2;
-use rodio::cpal::default_host;
-use rodio::source::SamplesConverter;
-use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
-use std::sync::Mutex;
-
-use std::fs::File;
-use std::io::{self, BufReader, Cursor, Read, Write};
-use std::path::{Path, PathBuf};
+use crossterm::terminal::{self};
+use std::io::{self, Write};
+use std::path::Path;
+use std::process::exit;
 use std::result::Result;
 use std::string::String;
-use std::sync::Arc;
-use std::thread::{JoinHandle, Thread, sleep, spawn};
-use std::time::Duration;
-use std::{result, thread};
-use walkdir::{self, WalkDir};
 // Import audio player struct
 mod player;
 use player::Player;
@@ -48,8 +35,37 @@ fn display_query(query: &String) {
     t_mv_end();
 }
 
+fn check_config_dir() -> bool {
+    if let Some(cfg_dir) = dirs::config_dir() {
+        let config_file = cfg_dir.join("rrplay").join("config");
+        if let Ok(path) = std::fs::read_to_string(config_file) {
+            let path = path.trim().to_string();
+            if !Path::exists(Path::new(&path)) {
+                t_clear_all();
+                t_mv_sol();
+                println!("invalid path in config file");
+                t_mv_sol();
+
+                terminal::disable_raw_mode().unwrap();
+                exit(1);
+            }
+        }
+    }
+    if let Some(cfg_dir) = dirs::config_dir() {
+        let config_file = cfg_dir.join("rrplay").join("config");
+        if !config_file.is_file() {
+            return false;
+        } else {
+            println!("{}", config_file.to_str().unwrap());
+            return true;
+        }
+    } else {
+        println!("failed fetching config dir");
+        return false;
+    }
+}
+
 fn main() {
-    terminal::enable_raw_mode().unwrap();
     let mut search_mode: bool = false;
     let mut search_str: String = String::new();
     let mut cmd_mode: bool = false;
@@ -57,9 +73,51 @@ fn main() {
     let mut index = 0;
     let mut search_results = Vec::new();
     let mut track_mode: bool = false;
-
+    let mut path = String::new();
     let mut player = Player::init();
+    if check_config_dir() == false {
+        println!("No config found, creating under .config/rrplay/config");
+        t_mv_sol();
+        println!("Enter the full path of your library for example: /home/kr24/Music");
+        t_mv_sol();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).expect("Err");
+        t_flush();
+        let input = input.trim();
+        // println!("{input}");
+        if Path::new(&input).exists() {
+            println!("Path valid, creating config file...");
+            t_mv_sol();
+            if let Some(cfg_dir) = dirs::config_dir() {
+                let mut config_file = cfg_dir.join("rrplay");
+                std::fs::create_dir_all(config_file.clone()).unwrap();
 
+                println!("writing to {}", config_file.to_str().unwrap());
+
+                config_file = cfg_dir.join("rrplay/config");
+                std::fs::write(config_file, input).unwrap();
+                println!("File created!");
+
+                t_mv_sol();
+                path = input.to_string();
+            } else {
+                println!("Path invalid, aborting...");
+                exit(1);
+            }
+        } else {
+            println!("Err....");
+            exit(1);
+        }
+    } else {
+        if let Some(cfg_dir) = dirs::config_dir() {
+            let config_file = cfg_dir.join("rrplay").join("config");
+            path = std::fs::read_to_string(config_file).unwrap();
+            println!("{path}");
+        }
+    }
+
+    let path = path.trim().to_string();
+    terminal::enable_raw_mode().unwrap();
     t_mv_start();
     t_clear_all();
 
@@ -67,17 +125,15 @@ fn main() {
         let event = read().unwrap();
         let t_sz = terminal::size().unwrap();
         if let Event::Key(key_event) = event {
-            if key_event.code == KeyCode::Char('p') {
-                if !cmd_mode || !search_mode {
-                    // Get the current state
-                    let current_playing = player.is_playing();
+            if key_event.code == KeyCode::Char('p') && (!cmd_mode || !search_mode) {
+                // Get the current state
+                let current_playing = player.is_playing();
 
-                    // Toggle the state based on current value
-                    if current_playing {
-                        player.pause_song();
-                    } else {
-                        player.resume_song();
-                    }
+                // Toggle the state based on current value
+                if current_playing {
+                    player.pause_song();
+                } else {
+                    player.resume_song();
                 }
             }
             if key_event.code == KeyCode::Char('c') && key_event.modifiers == KeyModifiers::CONTROL
@@ -193,7 +249,7 @@ fn main() {
                         cmd_str.clear();
                     } else {
                         search_str.pop();
-                        search_results = walkdir(&mut search_str);
+                        search_results = walkdir(&mut search_str, path.clone());
                         song_entries_print(&search_results, index);
                         display_query(&search_str);
                         t_mv_sol();
@@ -211,7 +267,7 @@ fn main() {
                     io::stdout().flush().unwrap();
                     search_str.push(chr);
                     if !search_str.is_empty() {
-                        search_results = walkdir(&mut search_str);
+                        search_results = walkdir(&mut search_str, path.clone());
                         song_entries_print(&search_results, index);
                         display_query(&search_str);
                     }
