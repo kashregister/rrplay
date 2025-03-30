@@ -57,6 +57,13 @@ impl PlayerState {
         }
     }
 
+    fn display_err(&self) {
+        t_mv_end();
+        t_clear_line();
+        t_mv_sol();
+        t_flush();
+        println!("Error playing file");
+    }
     fn display_query(&self) {
         let t_sz = terminal::size().unwrap();
         t_flush();
@@ -240,7 +247,7 @@ fn main() {
                 t_clear_all();
                 info_print();
                 index = 2;
-                io::stdout().flush().unwrap();
+                t_flush();
             } else if key_event.code == KeyCode::Enter {
                 if player_state.mode == PlayerMode::Search {
                     player_state.select();
@@ -271,7 +278,7 @@ fn main() {
                     } else if let Err(bad) = res {
                         print!("{}", bad);
                     }
-                    io::stdout().flush().unwrap();
+                    t_flush();
                     t_mv_start();
 
                     if let Some(query) = player_state.query.clone() {
@@ -281,17 +288,19 @@ fn main() {
                     }
                     player_state.query = None;
                 } else if player_state.mode == PlayerMode::Select {
-                    let song = get_song(&search_results, index);
-                    player.skip_song(true);
-                    player.current_song = song;
-                    player.play_song();
-                    // track_mode = false;
+                    if let Ok(song) = get_song(&search_results, index) {
+                        player.skip_song(true);
+                        player.current_song = Some(song);
+                        player.play_song();
+                    } else {
+                        player_state.display_err();
+                    }
                 }
             } else if key_event.code == KeyCode::Char(':') {
                 if player_state.mode != PlayerMode::Command {
                     t_clear_all();
                     io::stdout().execute(MoveTo(0, t_sz.1)).unwrap();
-                    io::stdout().flush().unwrap();
+                    t_flush();
 
                     player_state.command();
                     player_state.query = Some("".to_string());
@@ -304,7 +313,7 @@ fn main() {
                 if player_state.mode != PlayerMode::Search {
                     t_clear_all();
                     io::stdout().execute(MoveTo(0, t_sz.1)).unwrap();
-                    io::stdout().flush().unwrap();
+                    t_flush();
                     player_state.search();
                     player_state.query = Some(String::new());
                 }
@@ -317,19 +326,20 @@ fn main() {
                         .execute(MoveToRow(t_sz.1 - index as u16))
                         .unwrap();
                     t_mv_sol();
-                    io::stdout().flush().unwrap();
+                    t_flush();
                 }
             } else if key_event.code == KeyCode::Char('k') {
                 if player_state.mode == PlayerMode::Select && index < t_sz.1 as usize {
-                    index += 1;
-                    song_entries_print(&search_results, index);
-                    player_state.display_query();
-
-                    io::stdout()
-                        .execute(MoveToRow(t_sz.1 - index as u16))
-                        .unwrap();
-                    t_mv_sol();
-                    io::stdout().flush().unwrap();
+                    if index - 1 < search_results.len() {
+                        index += 1;
+                        song_entries_print(&search_results, index);
+                        player_state.display_query();
+                        io::stdout()
+                            .execute(MoveToRow(t_sz.1 - index as u16))
+                            .unwrap();
+                        t_mv_sol();
+                        t_flush();
+                    }
                 }
             } else if key_event.code == KeyCode::Backspace {
                 if player_state.mode == PlayerMode::Command {
