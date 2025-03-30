@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use std::thread;
 
 pub struct AudioPlayer {
-    pub current_song: SongEntry,
+    pub current_song: Option<SongEntry>,
     playing: Arc<Mutex<bool>>,
     skip: Arc<Mutex<bool>>,
 }
@@ -21,44 +21,46 @@ impl AudioPlayer {
             score: 0,
         };
         AudioPlayer {
-            current_song: entry,
+            current_song: Some(entry),
             playing: Arc::new(Mutex::new(true)),
             skip: Arc::new(Mutex::new(false)),
         }
     }
     pub fn play_song(&mut self) {
-        let file = BufReader::new(File::open(&self.current_song.file).unwrap());
-        self.resume_song();
-        let playing = self.playing.clone();
+        if let Some(ent) = self.current_song.clone() {
+            let file = BufReader::new(File::open(ent.file).unwrap());
+            self.resume_song();
+            let playing = self.playing.clone();
 
-        let skip = self.skip.clone();
-        thread::spawn(move || {
-            let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-            let sink = Sink::try_new(&stream_handle).unwrap();
+            let skip = self.skip.clone();
+            thread::spawn(move || {
+                let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+                let sink = Sink::try_new(&stream_handle).unwrap();
 
-            let source = Decoder::new(file).unwrap();
+                let source = Decoder::new(file).unwrap();
 
-            sink.append(source);
-            while !sink.empty() {
-                let playing_guard = playing.lock().unwrap();
+                sink.append(source);
+                while !sink.empty() {
+                    let playing_guard = playing.lock().unwrap();
 
-                let skip_guard = skip.lock().unwrap();
-                if playing_guard.eq(&false) {
-                    sink.pause();
-                } else {
-                    sink.play();
+                    let skip_guard = skip.lock().unwrap();
+                    if playing_guard.eq(&false) {
+                        sink.pause();
+                    } else {
+                        sink.play();
+                    }
+                    if skip_guard.eq(&true) {
+                        sink.stop();
+                        break;
+                    }
+                    // thread::sleep(Duration::new(1, 0));
                 }
-                if skip_guard.eq(&true) {
-                    sink.stop();
-                    break;
-                }
-                // thread::sleep(Duration::new(1, 0));
-            }
 
-            // sink.sleep_until_end();
-        });
+                // sink.sleep_until_end();
+            });
 
-        self.skip_song(false);
+            self.skip_song(false);
+        }
     }
 
     pub fn is_playing(&mut self) -> bool {

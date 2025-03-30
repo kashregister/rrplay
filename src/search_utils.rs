@@ -1,6 +1,6 @@
 use crossterm::terminal;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
-use std::path::PathBuf;
+use std::{path::PathBuf, usize};
 use walkdir::WalkDir;
 
 use crate::term_utils::*;
@@ -11,35 +11,9 @@ pub struct SongEntry {
     pub score: i64,
 }
 
-pub fn sort_entries(mut song_entries: Vec<SongEntry>) -> Vec<SongEntry> {
-    for (i, item) in song_entries.clone().iter().enumerate() {
-        if let Some(next_item) = song_entries.get(i + 1) {
-            if item.score > next_item.score {
-                song_entries.swap(i, i + 1);
-            }
-        }
-    }
-    song_entries.reverse();
-    song_entries
-}
-
-pub fn bubble_sort(mut vec: Vec<SongEntry>) -> Vec<SongEntry> {
-    let mut n = vec.len();
-    loop {
-        let mut swapped = false;
-
-        for i in 0..n - 1 {
-            if vec[i].score > vec[i + 1].score {
-                vec.swap(i, i + 1);
-                swapped = true;
-            }
-        }
-        if !swapped {
-            break;
-        }
-        n -= 1;
-    }
-    vec
+fn sort(mut entries: Vec<SongEntry>) -> Vec<SongEntry> {
+    entries.sort_by(|a, b| b.score.cmp(&a.score));
+    entries
 }
 
 pub fn walkdir(query: &mut String, path: String) -> Vec<SongEntry> {
@@ -63,15 +37,16 @@ pub fn walkdir(query: &mut String, path: String) -> Vec<SongEntry> {
             }
         }
     }
+
     let matcher = SkimMatcherV2::default();
     for entry in &mut song_entries {
         if let Some(score) = matcher.fuzzy_match(entry.file.to_str().unwrap(), query) {
             entry.score = score;
         }
     }
-    song_entries = sort_entries(song_entries.clone());
-    let cpy = song_entries.clone();
-    song_entries = bubble_sort(cpy);
+    song_entries.retain(|entry| entry.score > 0);
+    song_entries = sort(song_entries.clone());
+    song_entries.reverse();
     song_entries
 }
 
@@ -99,7 +74,7 @@ pub fn song_entries_print(s_e_vec: &[SongEntry], index: usize) {
                     } else {
                         &name
                     };
-                    if i == s_e_vec.len() - index + 1 {
+                    if i as i32 == s_e_vec.len() as i32 - index as i32 + 1 {
                         t_bg_gray();
                         t_flush();
                         print!("* {}", prnt);
@@ -115,8 +90,11 @@ pub fn song_entries_print(s_e_vec: &[SongEntry], index: usize) {
         }
     }
 }
-
-pub fn get_song(s_e_vec: &[SongEntry], index: usize) -> SongEntry {
-    let song = s_e_vec.get(s_e_vec.len() - index + 1).unwrap();
-    song.clone()
+pub fn get_song(s_e_vec: &[SongEntry], index: usize) -> Result<SongEntry, bool> {
+    let i = s_e_vec.len() as i32 - index as i32 + 1;
+    if let Some(song) = s_e_vec.get(i as usize) {
+        Ok(song.clone())
+    } else {
+        Err(false)
+    }
 }
