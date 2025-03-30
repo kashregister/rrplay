@@ -1,6 +1,6 @@
 use crossterm::terminal;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
-use std::{path::PathBuf, usize};
+use std::{path::PathBuf, process::exit, usize};
 use walkdir::WalkDir;
 
 use crate::term_utils::*;
