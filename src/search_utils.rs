@@ -76,26 +76,41 @@ pub fn walkdir(query: &mut String, path: String) -> Vec<SongEntry> {
 }
 
 pub fn song_entries_print(s_e_vec: &[SongEntry], index: usize) {
-    let t_sz = terminal::size().unwrap();
+    let t_sz = match terminal::size() {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+
     t_clear_all();
     for (i, entry) in s_e_vec.iter().enumerate() {
         t_mv_sol();
         t_flush();
         if entry.score > 0 {
-            let name = entry.file.file_name().unwrap().to_string_lossy();
-            let prnt = if name.len() > t_sz.0 as usize - 2 {
-                name.split_at(t_sz.0 as usize - 4).0
-            } else {
-                &name
-            };
-            if i == s_e_vec.len() - index + 1 {
-                t_bg_gray();
-                t_flush();
-                print!("* {}", prnt);
-                t_bg_reset();
-                println!();
-            } else {
-                println!("{prnt}");
+            match entry.file.file_name() {
+                Some(name) => {
+                    let name = name.to_string_lossy();
+                    let max_len = t_sz.0 as usize - 2;
+                    let prnt = if name.len() > max_len {
+                        let mut end_index = max_len - 2;
+                        while !name.is_char_boundary(end_index) {
+                            end_index -= 1;
+                        }
+                        &name[..end_index]
+                    } else {
+                        &name
+                    };
+                    if i == s_e_vec.len() - index + 1 {
+                        t_bg_gray();
+                        t_flush();
+                        print!("* {}", prnt);
+                        t_bg_reset();
+                        println!();
+                    } else {
+                        println!("{prnt}");
+                    }
+                }
+
+                None => continue,
             }
         }
     }
