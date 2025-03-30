@@ -3,6 +3,7 @@ use crossterm::cursor::{MoveTo, MoveToColumn, MoveToRow};
 use crossterm::event::{Event, KeyCode, KeyModifiers, read};
 use crossterm::style::{Colors, SetBackgroundColor};
 use crossterm::terminal::{self};
+use std::error::Error;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::exit;
@@ -24,6 +25,11 @@ enum PlayerMode {
     Select,
     Command,
     Search,
+}
+
+#[derive(PartialEq)]
+enum PlayerCommand {
+    Quit,
 }
 
 struct PlayerState {
@@ -144,15 +150,31 @@ impl PlayerState {
             }
         }
     }
-}
-fn run_cmd(cmd: &String) -> Result<&'static str, &'static str> {
-    println!("{cmd}");
-    if cmd.eq(":q") {
-        Ok("exit")
-    } else if cmd.eq(":source") {
-        Ok(":source")
-    } else {
-        Err("Wrong syntax")
+    fn run_cmd(&self) -> Result<PlayerCommand, ()> {
+        if self.mode == PlayerMode::Command {
+            if let Some(cmd) = self.query.clone() {
+                println!("{cmd}");
+                if cmd.eq(":q") {
+                    Ok(PlayerCommand::Quit)
+                } else {
+                    t_mv_end();
+                    t_clear_all();
+
+                    t_flush();
+
+                    t_bg_rgb([255, 165, 0]);
+                    // t_mv_one_up();
+                    print!("Wrong syntax");
+                    t_bg_reset();
+                    // println!();
+                    Err(())
+                }
+            } else {
+                Err(())
+            }
+        } else {
+            Err(())
+        }
     }
 }
 
@@ -177,7 +199,6 @@ fn check_config_dir() -> bool {
         if !config_file.is_file() {
             return false;
         } else {
-            println!("{}", config_file.to_str().unwrap());
             return true;
         }
     } else {
@@ -224,7 +245,7 @@ fn main() {
                 player_state.sources = Some(Vec::new());
 
                 let path = input.to_string().trim().to_string();
-                if let Some(mut sources) = player_state.sources.clone() {
+                if let Some(ref mut sources) = player_state.sources.clone() {
                     sources.push(path);
                 }
             } else {
@@ -239,19 +260,19 @@ fn main() {
         if let Some(cfg_dir) = dirs::config_dir() {
             let config_file = cfg_dir.join("rrplay").join("config");
             let mut path = std::fs::read_to_string(config_file).unwrap();
+
             path = path.trim().to_string();
             player_state.sources = Some(Vec::new());
-            if let Some(mut sources) = player_state.sources.clone() {
+            if let Some(ref mut sources) = player_state.sources {
                 sources.push(path);
             }
         }
     }
-
     terminal::enable_raw_mode().unwrap();
     t_mv_start();
     t_clear_all();
-
     player_state.info_print();
+
     'input: loop {
         let event = read().unwrap();
         let t_sz = terminal::size().unwrap();
@@ -297,22 +318,14 @@ fn main() {
                         .unwrap();
                     t_mv_sol();
                 } else if player_state.mode == PlayerMode::Command {
-                    let res;
-                    if let Some(query) = player_state.query.clone() {
-                        res = run_cmd(&query);
-                    } else {
-                        res = Ok("err");
-                    }
-                    player_state.sitback();
-                    t_clear_all();
-                    t_mv_end();
-                    if let Ok(good) = res {
-                        if good == "exit" {
+                    if let Ok(ret_cmd) = player_state.run_cmd() {
+                        if ret_cmd.eq(&PlayerCommand::Quit) {
                             break 'input;
                         }
-                    } else if let Err(bad) = res {
-                        print!("{}", bad);
                     }
+
+                    player_state.sitback();
+
                     t_flush();
                     t_mv_start();
 
