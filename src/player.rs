@@ -8,19 +8,19 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
 
-pub struct Player {
+pub struct AudioPlayer {
     pub current_song: SongEntry,
     playing: Arc<Mutex<bool>>,
     skip: Arc<Mutex<bool>>,
 }
 
-impl Player {
-    pub fn init() -> Player {
+impl AudioPlayer {
+    pub fn init() -> AudioPlayer {
         let entry = SongEntry {
             file: PathBuf::new(),
             score: 0,
         };
-        Player {
+        AudioPlayer {
             current_song: entry,
             playing: Arc::new(Mutex::new(true)),
             skip: Arc::new(Mutex::new(false)),

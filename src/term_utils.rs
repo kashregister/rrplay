@@ -40,6 +40,20 @@ pub fn t_bg_gray() {
         .execute(SetAttribute(crossterm::style::Attribute::Bold))
         .unwrap();
 }
+// make text bold
+
+pub fn t_txt_bold() {
+    io::stdout()
+        .execute(SetAttribute(crossterm::style::Attribute::Bold))
+        .unwrap();
+}
+
+// make text not bold
+pub fn t_txt_nobold() {
+    io::stdout()
+        .execute(SetAttribute(crossterm::style::Attribute::NoBold))
+        .unwrap();
+}
 // reset the terminals styling
 pub fn t_bg_reset() {
     io::stdout().execute(ResetColor).unwrap();
