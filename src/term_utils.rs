@@ -1,3 +1,4 @@
+use crossterm::cursor::MoveUp;
 use crossterm::*;
 use crossterm::{
     cursor::{self, MoveTo, MoveToColumn},
@@ -30,6 +31,20 @@ pub fn t_mv_end() {
 // move to the start of the current line
 pub fn t_mv_sol() {
     io::stdout().execute(MoveToColumn(0)).unwrap();
+}
+
+// move one up
+pub fn t_mv_one_up() {
+    io::stdout().execute(MoveUp(1)).unwrap();
+}
+pub fn t_bg_rgb(color: [u8; 3]) {
+    io::stdout()
+        .execute(SetBackgroundColor(crossterm::style::Color::Rgb {
+            r: (color[0]),
+            g: (color[1]),
+            b: (color[2]),
+        }))
+        .unwrap();
 }
 // change the lines style for the song we are hovering over
 pub fn t_bg_gray() {

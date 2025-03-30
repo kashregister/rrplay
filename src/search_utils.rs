@@ -16,7 +16,7 @@ fn sort(mut entries: Vec<SongEntry>) -> Vec<SongEntry> {
     entries
 }
 
-pub fn walkdir(query: &mut String, path: String) -> Vec<SongEntry> {
+pub fn walkdir(query: &mut String, paths: &Option<Vec<String>>) -> Vec<SongEntry> {
     if query.starts_with('/') {
         query.remove(0);
     }
@@ -26,14 +26,18 @@ pub fn walkdir(query: &mut String, path: String) -> Vec<SongEntry> {
         "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
     ];
     let mut song_entries = Vec::new();
-    for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-        if let Some(ext) = entry.path().extension() {
-            if file_types.contains(&ext.to_str().unwrap()) {
-                let tmp: SongEntry = SongEntry {
-                    file: (entry.path().to_owned()),
-                    score: (0),
-                };
-                song_entries.push(tmp);
+    if let Some(paths_ok) = paths {
+        for path in paths_ok {
+            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+                if let Some(ext) = entry.path().extension() {
+                    if file_types.contains(&ext.to_str().unwrap()) {
+                        let tmp: SongEntry = SongEntry {
+                            file: (entry.path().to_owned()),
+                            score: (0),
+                        };
+                        song_entries.push(tmp);
+                    }
+                }
             }
         }
     }
@@ -50,13 +54,21 @@ pub fn walkdir(query: &mut String, path: String) -> Vec<SongEntry> {
     song_entries
 }
 
-pub fn song_entries_print(s_e_vec: &[SongEntry], index: usize) {
+pub fn song_entries_print(s_e_vec: &[SongEntry], index: i32) {
     let t_sz = match terminal::size() {
         Ok(s) => s,
         Err(_) => return,
     };
 
     t_clear_all();
+    if s_e_vec.len() == 0 {
+        t_mv_sol();
+        t_flush();
+        t_bg_rgb([255, 20, 20]);
+        print!("No results...");
+        t_bg_reset();
+        println!();
+    }
     for (i, entry) in s_e_vec.iter().enumerate() {
         t_mv_sol();
         t_flush();
@@ -74,7 +86,7 @@ pub fn song_entries_print(s_e_vec: &[SongEntry], index: usize) {
                     } else {
                         &name
                     };
-                    if i as i32 == s_e_vec.len() as i32 - index as i32 + 1 {
+                    if i as i32 == s_e_vec.len() as i32 - index + 1 {
                         t_bg_gray();
                         t_flush();
                         print!("* {}", prnt);
@@ -90,8 +102,8 @@ pub fn song_entries_print(s_e_vec: &[SongEntry], index: usize) {
         }
     }
 }
-pub fn get_song(s_e_vec: &[SongEntry], index: usize) -> Result<SongEntry, bool> {
-    let i = s_e_vec.len() as i32 - index as i32 + 1;
+pub fn get_song(s_e_vec: &[SongEntry], index: i32) -> Result<SongEntry, bool> {
+    let i = s_e_vec.len() as i32 - index + 1;
     if let Some(song) = s_e_vec.get(i as usize) {
         Ok(song.clone())
     } else {
