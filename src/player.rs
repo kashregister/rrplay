@@ -1,5 +1,6 @@
 use crate::audio::AudioPlayer;
 
+use crate::search_utils::{get_album, get_song, song_entries_print, walkdir};
 use crate::term_utils::*;
 use crate::{ConfigHandler, SongEntry};
 use rodio::Decoder;
@@ -26,6 +27,15 @@ pub enum PlayerCommand {
     ClearQueue,
     TogglePause,
     Stop,
+    Help,
+}
+
+#[derive(PartialEq)]
+pub enum SearchCommand {
+    GetAlbum,
+    GetSingle,
+    PrintEntries,
+    SearchResults,
 }
 
 pub struct PlayerState {
@@ -53,7 +63,7 @@ impl PlayerState {
         };
     }
     pub fn play_queue(&mut self) {
-        if let Some(mut queue) = self.queue.clone() {
+        if let Some(queue) = self.queue.clone() {
             let playing = self.audio_player.playing.clone();
             let stop = self.audio_player.stop.clone();
             let skip = self.audio_player.skip.clone();
@@ -72,7 +82,7 @@ impl PlayerState {
                 while !sink.empty() {
                     let playing_guard = playing.lock().unwrap();
                     let stop_guard = stop.lock().unwrap();
-                    let skip_guard = skip.lock().unwrap();
+                    let mut skip_guard = skip.lock().unwrap();
 
                     if playing_guard.eq(&false) {
                         sink.pause();
@@ -81,6 +91,7 @@ impl PlayerState {
                     }
                     if skip_guard.eq(&true) {
                         sink.skip_one();
+                        *skip_guard = false;
                     }
 
                     if stop_guard.eq(&true) {
@@ -101,6 +112,35 @@ impl PlayerState {
             PlayerCommand::ClearQueue => self.queue = None,
             PlayerCommand::TogglePause => self.audio_player.toggle_pause(),
             PlayerCommand::Stop => self.audio_player.stop_all(true),
+            PlayerCommand::Help => {}
+        }
+    }
+
+    pub fn search_cmd(&mut self, search_cmd: SearchCommand) {
+        match search_cmd {
+            SearchCommand::GetAlbum => {
+                if let Some(has_results) = self.search_results.clone() {
+                    self.queue = get_album(&has_results, self.index)
+                }
+            }
+            SearchCommand::GetSingle => {
+                if let Some(has_results) = self.search_results.clone() {
+                    self.queue = get_song(&has_results, self.index)
+                } else {
+                    self.display_err();
+                }
+            }
+            SearchCommand::PrintEntries => {
+                if let Some(has_results) = self.search_results.clone() {
+                    song_entries_print(&has_results, self.index);
+                }
+            }
+            SearchCommand::SearchResults => {
+                if let Some(mut query_exists) = self.query.clone() {
+                    self.search_results =
+                        Some(walkdir(&mut query_exists, self.cfg_handler.sources.clone()));
+                }
+            }
         }
     }
     pub fn search(&mut self) {
@@ -170,7 +210,7 @@ impl PlayerState {
         }
 
         t_flush();
-        t_mv_col(t_sz.0 - 20);
+        t_mv_col(t_sz.0 - 13);
         t_txt_bold();
 
         if self.mode == PlayerMode::Search {
@@ -190,19 +230,11 @@ impl PlayerState {
         }
         t_txt_nobold();
         t_bg_reset();
-
         t_flush();
         t_mv_end();
     }
 
     pub fn info_print(&self) {
-        // print!("/ search\n\r");
-        // print!(": cmd mode\n\r");
-        // print!("enter - track mode\n");
-        // t_mv_sol();
-        // print!("p - pause\n\r");
-        // t_mv_end();
-
         t_mv_sol();
         t_mv_start();
         if let Some(song) = self.current_song.clone() {
@@ -252,6 +284,8 @@ impl PlayerState {
                 println!("{cmd}");
                 if cmd.eq(":q") {
                     Ok(PlayerCommand::Quit)
+                } else if cmd.eq(":h") || cmd.eq(":help") {
+                    Ok(PlayerCommand::Help)
                 } else {
                     t_mv_end();
                     t_clear_all();
