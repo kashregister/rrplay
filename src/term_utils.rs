@@ -1,4 +1,5 @@
 use crossterm::cursor::MoveUp;
+use crossterm::style::SetForegroundColor;
 use crossterm::*;
 use crossterm::{
     cursor::{self, MoveTo, MoveToColumn},
@@ -32,7 +33,9 @@ pub fn t_mv_end() {
 pub fn t_mv_sol() {
     io::stdout().execute(MoveToColumn(0)).unwrap();
 }
-
+pub fn t_mv_col(col: u16) {
+    io::stdout().execute(MoveToColumn(col));
+}
 // move one up
 pub fn t_mv_one_up() {
     io::stdout().execute(MoveUp(1)).unwrap();
@@ -40,6 +43,16 @@ pub fn t_mv_one_up() {
 pub fn t_bg_rgb(color: [u8; 3]) {
     io::stdout()
         .execute(SetBackgroundColor(crossterm::style::Color::Rgb {
+            r: (color[0]),
+            g: (color[1]),
+            b: (color[2]),
+        }))
+        .unwrap();
+}
+
+pub fn t_txt_rgb(color: [u8; 3]) {
+    io::stdout()
+        .execute(SetForegroundColor(crossterm::style::Color::Rgb {
             r: (color[0]),
             g: (color[1]),
             b: (color[2]),
@@ -83,4 +96,8 @@ pub fn t_cursor_show() {
 }
 pub fn t_cursor_hide() {
     io::stdout().execute(cursor::Hide).unwrap();
+}
+
+pub fn t_size_get() -> (u16, u16) {
+    terminal::size().unwrap()
 }

@@ -16,7 +16,7 @@ fn sort(mut entries: Vec<SongEntry>) -> Vec<SongEntry> {
     entries
 }
 
-pub fn walkdir(query: &mut String, paths: &Option<Vec<String>>) -> Vec<SongEntry> {
+pub fn walkdir(query: &mut String, paths: Vec<(String, bool)>) -> Vec<SongEntry> {
     if query.starts_with('/') {
         query.remove(0);
     }
@@ -26,9 +26,10 @@ pub fn walkdir(query: &mut String, paths: &Option<Vec<String>>) -> Vec<SongEntry
         "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
     ];
     let mut song_entries = Vec::new();
-    if let Some(paths_ok) = paths {
-        for path in paths_ok {
-            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+
+    for path in paths {
+        if path.1 == true {
+            for entry in WalkDir::new(path.0).into_iter().filter_map(|e| e.ok()) {
                 if let Some(ext) = entry.path().extension() {
                     if file_types.contains(&ext.to_str().unwrap()) {
                         let tmp: SongEntry = SongEntry {
@@ -102,11 +103,41 @@ pub fn song_entries_print(s_e_vec: &[SongEntry], index: i32) {
         }
     }
 }
-pub fn get_song(s_e_vec: &[SongEntry], index: i32) -> Result<SongEntry, bool> {
+pub fn get_song(s_e_vec: &[SongEntry], index: i32) -> Option<Vec<String>> {
+    let i = s_e_vec.len() as i32 - index + 1;
+
+    let mut queue = Vec::new();
+    if let Some(song) = s_e_vec.get(i as usize) {
+        let app = song.file.clone().into_os_string().into_string().unwrap();
+        queue.push(app);
+        Some(queue)
+    } else {
+        None
+    }
+}
+
+pub fn get_album(s_e_vec: &[SongEntry], index: i32) -> Option<Vec<String>> {
     let i = s_e_vec.len() as i32 - index + 1;
     if let Some(song) = s_e_vec.get(i as usize) {
-        Ok(song.clone())
+        let file_types = [
+            "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
+        ];
+
+        // song is the single song
+        let mut queue = Vec::new();
+        let mut dir = song.file.clone();
+        dir.pop();
+        for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+            if let Some(ext) = entry.path().extension() {
+                if file_types.contains(&ext.to_str().unwrap()) {
+                    let push = entry.path().to_owned();
+                    queue.push(push.into_os_string().into_string().unwrap());
+                }
+            }
+        }
+
+        Some(queue)
     } else {
-        Err(false)
+        None
     }
 }
