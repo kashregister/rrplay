@@ -1,6 +1,7 @@
 use crossterm::terminal;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
-use std::{path::PathBuf, process::exit, usize};
+use rodio::queue::queue;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use crate::term_utils::*;
@@ -16,7 +17,7 @@ fn sort(mut entries: Vec<SongEntry>) -> Vec<SongEntry> {
     entries
 }
 
-pub fn walkdir(query: &mut String, paths: Vec<(String, bool)>) -> Vec<SongEntry> {
+pub fn walkdir(query: &mut String, paths: Vec<(String, bool)>) -> Vec<String> {
     if query.starts_with('/') {
         query.remove(0);
     }
@@ -52,10 +53,14 @@ pub fn walkdir(query: &mut String, paths: Vec<(String, bool)>) -> Vec<SongEntry>
     song_entries.retain(|entry| entry.score > 0);
     song_entries = sort(song_entries.clone());
     song_entries.reverse();
-    song_entries
+    let mut out = Vec::new();
+    for item in song_entries {
+        out.push(item.file.into_os_string().into_string().unwrap());
+    }
+    out
 }
 
-pub fn song_entries_print(s_e_vec: &[SongEntry], index: i32) {
+pub fn song_entries_print(s_e_vec: &Vec<String>, index: i32) {
     let t_sz = match terminal::size() {
         Ok(s) => s,
         Err(_) => return,
@@ -73,42 +78,41 @@ pub fn song_entries_print(s_e_vec: &[SongEntry], index: i32) {
     for (i, entry) in s_e_vec.iter().enumerate() {
         t_mv_sol();
         t_flush();
-        if entry.score > 0 {
-            match entry.file.file_name() {
-                Some(name) => {
-                    let name = name.to_string_lossy();
-                    let max_len = t_sz.0 as usize - 2;
-                    let prnt = if name.len() > max_len {
-                        let mut end_index = max_len - 2;
-                        while !name.is_char_boundary(end_index) {
-                            end_index -= 1;
-                        }
-                        &name[..end_index]
-                    } else {
-                        &name
-                    };
-                    if i as i32 == s_e_vec.len() as i32 - index + 1 {
-                        t_bg_gray();
-                        t_flush();
-                        print!("* {}", prnt);
-                        t_bg_reset();
-                        println!();
-                    } else {
-                        println!("{prnt}");
+        let path = PathBuf::from(entry);
+        match path.file_name() {
+            Some(name) => {
+                let name = name.to_string_lossy();
+                let max_len = t_sz.0 as usize - 2;
+                let prnt = if name.len() > max_len {
+                    let mut end_index = max_len - 2;
+                    while !name.is_char_boundary(end_index) {
+                        end_index -= 1;
                     }
+                    &name[..end_index]
+                } else {
+                    &name
+                };
+                if i as i32 == s_e_vec.len() as i32 - index + 1 {
+                    t_bg_gray();
+                    t_flush();
+                    print!("* {}", prnt);
+                    t_bg_reset();
+                    println!();
+                } else {
+                    println!("{prnt}");
                 }
-
-                None => continue,
             }
+
+            None => continue,
         }
     }
 }
-pub fn get_song(s_e_vec: &[SongEntry], index: i32) -> Option<Vec<String>> {
+pub fn get_song(s_e_vec: &Vec<String>, index: i32) -> Option<Vec<String>> {
     let i = s_e_vec.len() as i32 - index + 1;
 
     let mut queue = Vec::new();
     if let Some(song) = s_e_vec.get(i as usize) {
-        let app = song.file.clone().into_os_string().into_string().unwrap();
+        let app = song.clone();
         queue.push(app);
         Some(queue)
     } else {
@@ -116,7 +120,7 @@ pub fn get_song(s_e_vec: &[SongEntry], index: i32) -> Option<Vec<String>> {
     }
 }
 
-pub fn get_album(s_e_vec: &[SongEntry], index: i32) -> Option<Vec<String>> {
+pub fn get_album(s_e_vec: &Vec<String>, index: i32) -> Option<Vec<String>> {
     let i = s_e_vec.len() as i32 - index + 1;
     if let Some(song) = s_e_vec.get(i as usize) {
         let file_types = [
@@ -125,7 +129,7 @@ pub fn get_album(s_e_vec: &[SongEntry], index: i32) -> Option<Vec<String>> {
 
         // song is the single song
         let mut queue = Vec::new();
-        let mut dir = song.file.clone();
+        let mut dir = PathBuf::from(song);
         dir.pop();
         for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
             if let Some(ext) = entry.path().extension() {
