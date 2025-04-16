@@ -34,7 +34,7 @@ pub fn t_mv_sol() {
     io::stdout().execute(MoveToColumn(0)).unwrap();
 }
 pub fn t_mv_col(col: u16) {
-    io::stdout().execute(MoveToColumn(col));
+    io::stdout().execute(MoveToColumn(col)).unwrap();
 }
 // move one up
 pub fn t_mv_one_up() {
