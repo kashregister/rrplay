@@ -9,7 +9,7 @@ use rodio::Sink;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::thread;
+use std::{thread, time};
 
 #[derive(PartialEq)]
 pub enum PlayerMode {
@@ -80,6 +80,7 @@ impl PlayerState {
                 }
 
                 while !sink.empty() {
+                    thread::sleep(time::Duration::from_millis(100));
                     let playing_guard = playing.lock().unwrap();
                     let stop_guard = stop.lock().unwrap();
                     let mut skip_guard = skip.lock().unwrap();

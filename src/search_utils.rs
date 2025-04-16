@@ -1,7 +1,6 @@
 use crossterm::terminal;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
-use rodio::queue::queue;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use walkdir::WalkDir;
 
 use crate::term_utils::*;
