@@ -3,13 +3,14 @@ use crate::audio::AudioPlayer;
 use crate::search_utils::{get_album, get_song, song_entries_print, walkdir};
 use crate::term_utils::*;
 use crate::{ConfigHandler, SongEntry};
+
 use rodio::Decoder;
-use rodio::OutputStream;
-use rodio::Sink;
-use std::fs::File;
-use std::io::BufReader;
+
 use std::path::Path;
-use std::{thread, time};
+use std::{fs::File, io::BufReader, sync::Arc};
+
+use tokio::task;
+use tokio::time::Duration;
 
 #[derive(PartialEq)]
 pub enum PlayerMode {
@@ -62,43 +63,64 @@ impl PlayerState {
             search_results: None,
         };
     }
-    pub fn play_queue(&mut self) {
+    pub async fn play_queue(&mut self) {
+        // Stop and clear previous sink
+        if let Some(ref mut sink) = *self.audio_player.sink.lock().unwrap() {
+            sink.stop();
+        }
+
         if let Some(queue) = self.queue.clone() {
-            let playing = self.audio_player.playing.clone();
-            let stop = self.audio_player.stop.clone();
-            let skip = self.audio_player.skip.clone();
+            let playing = Arc::clone(&self.audio_player.playing);
+            let stop = Arc::clone(&self.audio_player.stop);
+            let skip = Arc::clone(&self.audio_player.skip);
+            let sink_ref = Arc::clone(&self.audio_player.sink);
 
             self.audio_player.play();
-            thread::spawn(move || {
-                let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-                let sink = Sink::try_new(&stream_handle).unwrap();
 
+            task::spawn_blocking(move || {
                 for entry in queue {
                     let file = BufReader::new(File::open(entry).unwrap());
                     let source = Decoder::new(file).unwrap();
-                    sink.append(source);
+
+                    if let Ok(mut sink_guard) = sink_ref.lock() {
+                        if let Some(sink) = sink_guard.as_mut() {
+                            sink.append(source);
+                        }
+                    }
                 }
 
-                while !sink.empty() {
-                    thread::sleep(time::Duration::from_millis(100));
-                    let playing_guard = playing.lock().unwrap();
-                    let stop_guard = stop.lock().unwrap();
-                    let mut skip_guard = skip.lock().unwrap();
+                loop {
+                    {
+                        let playing_guard = playing.lock().unwrap();
+                        let stop_guard = stop.lock().unwrap();
+                        let mut skip_guard = skip.lock().unwrap();
+                        let mut sink_guard = sink_ref.lock().unwrap();
 
-                    if playing_guard.eq(&false) {
-                        sink.pause();
-                    } else {
-                        sink.play();
-                    }
-                    if skip_guard.eq(&true) {
-                        sink.skip_one();
-                        *skip_guard = false;
+                        if let Some(sink) = sink_guard.as_mut() {
+                            if *stop_guard {
+                                sink.stop();
+                                break;
+                            }
+
+                            if !*playing_guard {
+                                sink.pause();
+                            } else {
+                                sink.play();
+                            }
+
+                            if *skip_guard {
+                                sink.stop(); // crude skip
+                                *skip_guard = false;
+                                break;
+                            }
+
+                            if sink.empty() {
+                                break;
+                            }
+                        }
                     }
 
-                    if stop_guard.eq(&true) {
-                        sink.stop();
-                        break;
-                    }
+                    std::thread::sleep(Duration::from_millis(100));
                 }
             });
 
@@ -106,6 +128,7 @@ impl PlayerState {
             self.audio_player.stop_all(false);
         }
     }
+
     pub fn audio_cmd(&mut self, pcmd: PlayerCommand) {
         match pcmd {
             PlayerCommand::Quit => self.mode = PlayerMode::Bye,
