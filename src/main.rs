@@ -18,7 +18,8 @@ use player::{PlayerCommand, SearchCommand};
 use search_utils::*;
 use term_utils::*;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let mut player_state = PlayerState::init();
     player_state.cfg_handler.startup();
 
@@ -27,7 +28,7 @@ fn main() {
     t_clear_all();
     player_state.info_print();
 
-    'input: loop {
+    loop {
         let event = read().unwrap();
         let t_sz = terminal::size().unwrap();
         if let Event::Resize(_x, _y) = event {
@@ -49,7 +50,14 @@ fn main() {
             }
             if key_event.code == KeyCode::Char('c') && key_event.modifiers == KeyModifiers::CONTROL
             {
-                break 'input;
+                player_state.audio_cmd(PlayerCommand::ClearQueue);
+
+                terminal::disable_raw_mode().unwrap();
+                t_clear_all();
+                t_mv_start();
+                t_cursor_show();
+                t_bg_reset();
+                std::process::exit(0);
             } else if key_event.code == KeyCode::Esc {
                 t_cursor_show();
                 player_state.sitback();
@@ -73,7 +81,13 @@ fn main() {
                 } else if player_state.mode == PlayerMode::Command {
                     if let Ok(ret_cmd) = player_state.run_cmd() {
                         if ret_cmd.eq(&PlayerCommand::Quit) {
-                            break 'input;
+                            player_state.audio_cmd(PlayerCommand::ClearQueue);
+                            terminal::disable_raw_mode().unwrap();
+                            t_clear_all();
+                            t_mv_start();
+                            t_cursor_show();
+                            t_bg_reset();
+                            std::process::exit(0);
                         } else if ret_cmd.eq(&PlayerCommand::Help) {
                             t_clear_all();
                             t_mv_sol();
@@ -103,7 +117,7 @@ fn main() {
                     player_state.audio_cmd(PlayerCommand::Stop);
                     player_state.audio_cmd(PlayerCommand::ClearQueue);
                     player_state.search_cmd(SearchCommand::GetSingle);
-                    player_state.play_queue();
+                    player_state.play_queue().await;
                 }
             } else if key_event.code == KeyCode::Char(':') {
                 if player_state.mode != PlayerMode::Command {
@@ -157,7 +171,7 @@ fn main() {
                     player_state.audio_cmd(PlayerCommand::Stop);
                     player_state.audio_cmd(PlayerCommand::ClearQueue);
                     player_state.search_cmd(SearchCommand::GetAlbum);
-                    player_state.play_queue();
+                    player_state.play_queue().await;
                 }
             } else if key_event.code == KeyCode::Backspace {
                 if player_state.mode == PlayerMode::Command {
@@ -213,9 +227,4 @@ fn main() {
             }
         }
     }
-    terminal::disable_raw_mode().unwrap();
-    t_clear_all();
-    t_mv_start();
-    t_cursor_show();
-    t_bg_reset();
 }

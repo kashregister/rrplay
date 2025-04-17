@@ -7,7 +7,7 @@ in
   pkgs.rustPlatform.buildRustPackage rec {
     pname = "rrplay";
     version = "0.1.0";
-    src = pkgs.lib.cleanSource "${theSource}";
+    src = pkgs.lib.cleanSource theSource;
     cargoLock.lockFile = "${src}/Cargo.lock";
     buildInputs = with pkgs; [
       dbus
