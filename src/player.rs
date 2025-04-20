@@ -70,12 +70,7 @@ impl PlayerState {
         }
 
         if let Some(queue) = self.queue.clone() {
-            let playing = Arc::clone(&self.audio_player.playing);
-            let stop = Arc::clone(&self.audio_player.stop);
-            let skip = Arc::clone(&self.audio_player.skip);
             let sink_ref = Arc::clone(&self.audio_player.sink);
-
-            self.audio_player.play();
 
             task::spawn_blocking(move || {
                 for entry in queue {
@@ -91,51 +86,43 @@ impl PlayerState {
 
                 loop {
                     {
-                        let playing_guard = playing.lock().unwrap();
-                        let stop_guard = stop.lock().unwrap();
-                        let mut skip_guard = skip.lock().unwrap();
                         let mut sink_guard = sink_ref.lock().unwrap();
 
                         if let Some(sink) = sink_guard.as_mut() {
-                            if *stop_guard {
-                                sink.stop();
-                                break;
-                            }
-
-                            if !*playing_guard {
-                                sink.pause();
-                            } else {
-                                sink.play();
-                            }
-
-                            if *skip_guard {
-                                sink.stop(); // crude skip
-                                *skip_guard = false;
-                                break;
-                            }
-
                             if sink.empty() {
                                 break;
                             }
                         }
                     }
-
                     std::thread::sleep(Duration::from_millis(100));
                 }
             });
-
-            self.audio_player.skip_song(false);
-            self.audio_player.stop_all(false);
         }
     }
 
     pub fn audio_cmd(&mut self, pcmd: PlayerCommand) {
         match pcmd {
             PlayerCommand::Quit => self.mode = PlayerMode::Bye,
-            PlayerCommand::Skip => self.audio_player.skip_song(true),
+            PlayerCommand::Skip => {
+                if let Some(ref mut sink) = *self.audio_player.sink.lock().unwrap() {
+                    sink.skip_one();
+                }
+            }
             PlayerCommand::ClearQueue => self.queue = None,
-            PlayerCommand::TogglePause => self.audio_player.toggle_pause(),
-            PlayerCommand::Stop => self.audio_player.stop_all(true),
+            PlayerCommand::TogglePause => {
+                if let Some(ref mut sink) = *self.audio_player.sink.lock().unwrap() {
+                    if sink.is_paused() {
+                        sink.play();
+                    } else {
+                        sink.pause();
+                    }
+                }
+            }
+            PlayerCommand::Stop => {
+                if let Some(ref mut sink) = *self.audio_player.sink.lock().unwrap() {
+                    sink.stop();
+                }
+            }
             PlayerCommand::Help => {}
         }
     }
