@@ -216,6 +216,7 @@ async fn main() {
                     io::stdout().flush().unwrap();
                     player_state.push_chr(chr);
                     player_state.display_query();
+
                     player_state.search_cmd(SearchCommand::SearchResults);
                     player_state.search_cmd(SearchCommand::PrintEntries);
                     player_state.display_query();

@@ -31,8 +31,7 @@ pub enum PlayerCommand {
     Help,
 }
 
-#[derive(PartialEq)]
-pub enum SearchCommand {
+#[derive(PartialEq)] pub enum SearchCommand {
     GetAlbum,
     GetSingle,
     PrintEntries,
