@@ -1,6 +1,5 @@
 {
   description = "A Nix-flake-based Rust development environment";
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay = {
@@ -59,7 +58,7 @@
 
     packages = forEachSupportedSystem ({pkgs}: {
       default = pkgs.rustPlatform.buildRustPackage rec {
-        pname = "myproject";
+        pname = "rrplay";
         version = "0.1.0";
         src = "./";
         cargoLock.lockFile = ./Cargo.lock;
