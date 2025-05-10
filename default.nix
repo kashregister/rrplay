@@ -1,4 +1,4 @@
-{pkgs ? import <nixpkgs> {}}: let
+{pkgs ? import <nixpkgs> {}, ...}: let
   manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
 in
   pkgs.rustPlatform.buildRustPackage rec {
@@ -15,6 +15,4 @@ in
     nativeBuildInputs = with pkgs; [
       pkg-config
     ];
-
-    dbus = pkgs.dbus;
   }
