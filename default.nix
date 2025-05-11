@@ -3,11 +3,10 @@
   src ? ./.,
 }: let
   theSource = src;
-  manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
 in
   pkgs.rustPlatform.buildRustPackage rec {
-    pname = manifest.name;
-    version = manifest.version;
+    pname = "rrplay";
+    version = "0.1";
     cargoLock.lockFile = "${src}/Cargo.lock";
     src = pkgs.lib.cleanSource theSource;
 
