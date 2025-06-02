@@ -21,9 +21,9 @@ not.
 
 ### Modes
 
-: - Command mode\
-/ - Search mode\
-Enter - Select mode (While being in search mode)
+: Command mode\
+/ Search mode\
+(Enter) Select mode (While being in search mode)
 
 ### Keybinds
 
@@ -55,7 +55,10 @@ Or if you prefer doing it manually:
 
 ```bash
 cargo build --release
+```
 
 Nix\
 to be added
+
+```
 ```
