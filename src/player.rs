@@ -29,9 +29,12 @@ pub enum PlayerCommand {
     TogglePause,
     Stop,
     Help,
+    VolumeUp,
+    VolumeDown,
 }
 
-#[derive(PartialEq)] pub enum SearchCommand {
+#[derive(PartialEq)]
+pub enum SearchCommand {
     GetAlbum,
     GetSingle,
     PrintEntries,
@@ -123,6 +126,28 @@ impl PlayerState {
                 }
             }
             PlayerCommand::Help => {}
+            PlayerCommand::VolumeUp => {
+                if let Some(ref mut sink) = *self.audio_player.sink.lock().unwrap() {
+                    let mut volume = sink.volume();
+                    volume += 0.05;
+                    if volume > 1.0 {
+                        volume = 1.0;
+                    }
+                    sink.set_volume(volume);
+                }
+                self.display_query();
+            }
+            PlayerCommand::VolumeDown => {
+                if let Some(ref mut sink) = *self.audio_player.sink.lock().unwrap() {
+                    let mut volume = sink.volume();
+                    volume -= 0.05;
+                    if volume < 0.0 {
+                        volume = 0.0;
+                    }
+                    sink.set_volume(volume);
+                }
+                self.display_query();
+            }
         }
     }
 
@@ -191,9 +216,11 @@ impl PlayerState {
     }
     pub fn display_query(&self) {
         let t_sz = t_size_get();
-        t_flush();
         t_cursor_hide();
+        t_mv_end();
         t_mv_sol();
+        t_clear_line();
+
         if self.mode == PlayerMode::Command {
             if let Some(qr) = self.query.clone() {
                 let query = qr;
@@ -206,7 +233,7 @@ impl PlayerState {
                 }
             }
         }
-        if self.mode == PlayerMode::Search {
+        if self.mode == PlayerMode::Search || self.mode == PlayerMode::Select {
             if let Some(qr) = self.query.clone() {
                 let query = qr;
                 if let Some(qury) = query.chars().nth(0) {
@@ -219,10 +246,16 @@ impl PlayerState {
             }
         }
 
-        t_flush();
-        t_mv_col(t_sz.0 - 13);
-        t_txt_bold();
+        t_mv_col(t_sz.0 - 25);
+        if self.mode != PlayerMode::Command {
+            if let Some(ref mut sink) = *self.audio_player.sink.lock().unwrap() {
+                let volume = (sink.volume() * 100.0) as i16;
+                print!("volume: {}", volume);
+            }
+        }
 
+        t_txt_bold();
+        t_mv_col(t_sz.0 - 13);
         if self.mode == PlayerMode::Search {
             print!("Search mode")
         }
@@ -287,6 +320,8 @@ impl PlayerState {
         print!("Sourcing from:");
         t_flush();
         t_cursor_hide();
+        t_mv_end();
+        self.display_query();
     }
     pub fn run_cmd(&self) -> Result<PlayerCommand, ()> {
         if self.mode == PlayerMode::Command {
