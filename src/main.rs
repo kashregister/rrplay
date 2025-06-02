@@ -47,6 +47,18 @@ async fn main() {
                 {
                     player_state.audio_cmd(PlayerCommand::Skip);
                 }
+            } else if key_event.code == KeyCode::Char('v') {
+                if player_state.mode == PlayerMode::Select
+                    || player_state.mode == PlayerMode::Sitback
+                {
+                    player_state.audio_cmd(PlayerCommand::VolumeDown);
+                }
+            } else if key_event.code == KeyCode::Char('V') {
+                if player_state.mode == PlayerMode::Select
+                    || player_state.mode == PlayerMode::Sitback
+                {
+                    player_state.audio_cmd(PlayerCommand::VolumeUp);
+                }
             }
             if key_event.code == KeyCode::Char('c') && key_event.modifiers == KeyModifiers::CONTROL
             {
@@ -91,14 +103,25 @@ async fn main() {
                         } else if ret_cmd.eq(&PlayerCommand::Help) {
                             t_clear_all();
                             t_mv_sol();
-                            t_flush();
-                            println!("p - pause");
+                            t_txt_bold();
+                            println!("General:");
+                            t_txt_nobold();
                             t_mv_sol();
-                            println!("s - skip");
+                            println!("p - Pause");
                             t_mv_sol();
-                            println!("enter - play single");
+                            println!("s - Skip song");
                             t_mv_sol();
-                            println!("a - play album");
+                            println!("V - Volume up");
+                            t_mv_sol();
+                            println!("v - Volume down");
+                            t_txt_bold();
+                            t_mv_sol();
+                            println!("Select mode:");
+                            t_txt_nobold();
+                            t_mv_sol();
+                            println!("Enter - Play single");
+                            t_mv_sol();
+                            println!("a - Play album");
                             t_mv_sol();
                             t_flush();
                         }
