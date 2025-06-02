@@ -104,6 +104,19 @@ async fn main() {
                             t_clear_all();
                             t_mv_sol();
                             t_txt_bold();
+                            println!("Modes:");
+                            t_txt_nobold();
+                            t_mv_sol();
+                            println!(": Command mode");
+
+                            t_mv_sol();
+                            println!("/ Search mode");
+                            t_mv_sol();
+                            println!("(Enter) Select mode (While being in search mode)");
+                            t_mv_sol();
+                            println!("(Esc) Sitback mode");
+                            t_mv_sol();
+                            t_txt_bold();
                             println!("General:");
                             t_txt_nobold();
                             t_mv_sol();
