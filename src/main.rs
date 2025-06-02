@@ -153,6 +153,7 @@ async fn main() {
                     player_state.audio_cmd(PlayerCommand::Stop);
                     player_state.audio_cmd(PlayerCommand::ClearQueue);
                     player_state.search_cmd(SearchCommand::GetSingle);
+                    player_state.audio_cmd(PlayerCommand::Resume);
                     player_state.play_queue().await;
                 }
             } else if key_event.code == KeyCode::Char(':') {
@@ -207,6 +208,7 @@ async fn main() {
                     player_state.audio_cmd(PlayerCommand::Stop);
                     player_state.audio_cmd(PlayerCommand::ClearQueue);
                     player_state.search_cmd(SearchCommand::GetAlbum);
+                    player_state.audio_cmd(PlayerCommand::Resume);
                     player_state.play_queue().await;
                 }
             } else if key_event.code == KeyCode::Backspace {
