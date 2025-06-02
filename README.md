@@ -19,13 +19,13 @@ not.
 
 # Navigation:
 
-### Modes
+### Keybinds
 
+**Modes:**\
 : Command mode\
 / Search mode\
-(Enter) Select mode (While being in search mode)
-
-### Keybinds
+(Enter) Select mode (While being in search mode)\
+(Esc) Sitback mode (Just shows your queue and other info)
 
 **General:**\
 p - Pause\
