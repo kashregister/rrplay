@@ -31,6 +31,7 @@ pub enum PlayerCommand {
     Help,
     VolumeUp,
     VolumeDown,
+    Resume,
 }
 
 #[derive(PartialEq)]
@@ -118,6 +119,11 @@ impl PlayerState {
                     } else {
                         sink.pause();
                     }
+                }
+            }
+            PlayerCommand::Resume => {
+                if let Some(ref mut sink) = *self.audio_player.sink.lock().unwrap() {
+                    sink.play();
                 }
             }
             PlayerCommand::Stop => {
