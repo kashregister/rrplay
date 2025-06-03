@@ -302,7 +302,6 @@ impl PlayerState {
                 }
             }
         }
-        t_flush();
         t_mv_end();
         for (source, valid) in self.cfg_handler.sources.clone().into_iter() {
             t_mv_one_up();
@@ -320,14 +319,14 @@ impl PlayerState {
                 print!("{}", source);
                 t_bg_reset();
             }
-
-            t_flush();
         }
+        t_mv_one_up();
+        t_mv_sol();
         print!("Sourcing from:");
-        t_flush();
         t_cursor_hide();
         t_mv_end();
         self.display_query();
+        t_flush();
     }
     pub fn run_cmd(&self) -> Result<PlayerCommand, ()> {
         if self.mode == PlayerMode::Command {

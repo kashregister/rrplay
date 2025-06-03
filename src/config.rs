@@ -73,11 +73,12 @@ impl ConfigHandler {
 
             for path in paths {
                 let ap = path.trim().to_string();
-
-                if Path::new(&ap).exists() {
-                    self.sources.push((ap, true));
-                } else {
-                    self.sources.push((ap, false));
+                if ap.len() > 0 {
+                    if Path::new(&ap).exists() {
+                        self.sources.push((ap, true));
+                    } else {
+                        self.sources.push((ap, false));
+                    }
                 }
             }
         }
