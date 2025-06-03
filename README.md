@@ -32,6 +32,7 @@ p - Pause\
 s - Skip song\
 V - Volume up\
 v - Volume down\
+
 **Select mode:**\
 Enter - Play single\
 a - Play album
@@ -58,7 +59,22 @@ cargo build --release
 ```
 
 Nix\
-to be added
+Using flakes:
 
+```nix
+inputs = {
+    rrplay.url = "github:kashregister/rrplay";
+  };
 ```
+```nix
+  outputs = inputs @ {
+    self,
+    rrplay,
+    ...
+  }:
+```
+```nix
+  home.packages = with pkgs; [
+    inputs.rrplay.packages.${pkgs.system}.default
+  ];
 ```
