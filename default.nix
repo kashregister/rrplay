@@ -1,21 +1,16 @@
-{
-  pkgs ? import <nixpkgs> {},
-  src ? ./.,
-}: let
-  theSource = src;
-in
-  pkgs.rustPlatform.buildRustPackage rec {
-    pname = "rrplay";
-    version = "0.1";
-    cargoLock.lockFile = ./Cargo.lock;
-    src = pkgs.lib.cleanSource theSource;
+{pkgs ? import <nixpkgs> {}}:
+pkgs.rustPlatform.buildRustPackage rec {
+  pname = "rrplay";
+  version = "0.1";
+  cargoLock.lockFile = ./Cargo.lock;
+  src = pkgs.lib.cleanSource ./.;
 
-    buildInputs = with pkgs; [
-      dbus
-      alsa-lib
-    ];
+  buildInputs = with pkgs; [
+    dbus
+    alsa-lib
+  ];
 
-    nativeBuildInputs = with pkgs; [
-      pkg-config
-    ];
-  }
+  nativeBuildInputs = with pkgs; [
+    pkg-config
+  ];
+}
