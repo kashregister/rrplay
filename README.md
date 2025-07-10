@@ -6,6 +6,8 @@ Aims for fast navigation which i missed from most players.
 
 # Sources
 
+(Still wip in v2, please manually make your config folder and the file for now)
+
 You are prompted to choose your source folder when first opening the program.\
 example:
 
@@ -32,10 +34,13 @@ p - Pause\
 s - Skip song\
 V - Volume up\
 v - Volume down\
+c - Clear queue\
+h - move backwards 5s\
+l - move forward 5s
 
 **Select mode:**\
-Enter - Play single\
-a - Play album
+Enter - Add single to queue\
+a - Add album to queue
 
 ### Searching
 
@@ -66,15 +71,17 @@ inputs = {
     rrplay.url = "github:kashregister/rrplay";
   };
 ```
+
 ```nix
-  outputs = inputs @ {
-    self,
-    rrplay,
-    ...
-  }:
+outputs = inputs @ {
+  self,
+  rrplay,
+  ...
+}:
 ```
+
 ```nix
-  home.packages = with pkgs; [
-    inputs.rrplay.packages.${pkgs.system}.default
-  ];
+home.packages = with pkgs; [
+  inputs.rrplay.packages.${pkgs.system}.default
+];
 ```
