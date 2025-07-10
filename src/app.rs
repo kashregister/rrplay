@@ -356,15 +356,12 @@ impl App {
                 KeyCode::Char(' ') => {
                     self.query.push_str(" ");
                 }
-                KeyCode::Esc => {}
-                _ => {
-                    if self.mode == Mode::Search {
-                        if KeyCode::Backspace == key_event.code {
-                            self.query.pop();
-                            // self.search_results =
-                        } else {
-                            self.query.push_str(&key_event.code.to_string());
-                        }
+                KeyCode::Backspace => {
+                    if KeyModifiers::ALT == key_event.modifiers {
+                        self.query.clear();
+                    } else {
+                        self.query.pop();
+
                         if self.query.len() > 0 {
                             let matcher = SkimMatcherV2::default();
                             let mut entries_with_score: Vec<(String, i64)> = Vec::new();
@@ -383,6 +380,29 @@ impl App {
                             for entry in entries_with_score {
                                 self.search_results.push(entry.0)
                             }
+                        }
+                    }
+                }
+                KeyCode::Esc => {}
+                _ => {
+                    self.query.push_str(&key_event.code.to_string());
+                    if self.query.len() > 0 {
+                        let matcher = SkimMatcherV2::default();
+                        let mut entries_with_score: Vec<(String, i64)> = Vec::new();
+                        for entry in self.search_cache.clone() {
+                            if let Some(score) =
+                                matcher.fuzzy_match(entry.as_str(), self.query.as_str())
+                            {
+                                if score > 0 {
+                                    entries_with_score.push((entry, score));
+                                };
+                            }
+                        }
+
+                        entries_with_score.sort_by(|a, b| b.1.cmp(&a.1));
+                        self.search_results = Vec::new();
+                        for entry in entries_with_score {
+                            self.search_results.push(entry.0)
                         }
                     }
                 }
