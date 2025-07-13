@@ -33,6 +33,7 @@ pub enum Event {
 pub enum AppEvent {
     Quit,
     ClearQueue,
+    RefreshResults,
     Search,
     Select,
     Escape,

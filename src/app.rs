@@ -1,6 +1,8 @@
 use crate::event::{AppEvent, Event, EventHandler};
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use lofty::file::AudioFile;
+use lofty::prelude::*;
+use lofty::probe::Probe;
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
@@ -8,7 +10,6 @@ use ratatui::{
 use rodio::{OutputStream, Sink};
 use std::io::BufReader;
 use std::path::Path;
-use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 use walkdir::WalkDir;
@@ -16,14 +17,25 @@ use walkdir::WalkDir;
 const VOLUME_CHANGE: f32 = 0.1;
 const SEEK_CHANGE: Duration = Duration::from_secs(5);
 /// Application.
-// #[derive(Debug)]
+#[derive(Clone)]
+pub struct Song {
+    pub file_path: String,
+    pub file_type: String,
+    pub file_name: String,
+    pub is_valid: bool,
+    pub title: String,
+    pub artist: String,
+    pub album: String,
+    pub genre: String,
+    pub duration: Duration,
+}
 pub struct App {
     /// Is the application running?
     pub running: bool,
 
-    pub search_results: Vec<String>,
-    pub search_cache: Vec<String>,
-    pub queue: Vec<(String, Duration)>,
+    pub search_results: Vec<Song>,
+    pub search_cache: Vec<Song>,
+    pub queue: Vec<Song>,
     pub query: String,
     pub select_index: usize,
     pub sources: Option<Vec<(String, bool)>>,
@@ -113,7 +125,7 @@ impl App {
             None
         }
     }
-    pub fn search_directories(sources: Option<Vec<(String, bool)>>) -> Vec<String> {
+    pub fn search_directories(sources: Option<Vec<(String, bool)>>) -> Vec<Song> {
         if let Some(sources) = sources {
             let mut out = Vec::new();
             for source in sources {
@@ -121,15 +133,72 @@ impl App {
                     let file_types = [
                         "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
                     ];
-                    let mut song_entries = Vec::new();
+
                     for entry in WalkDir::new(source.0).into_iter().filter_map(|e| e.ok()) {
                         if let Some(ext) = entry.path().extension() {
                             if file_types.contains(&ext.to_str().unwrap()) {
-                                song_entries.push(entry.path().display().to_string());
+                                if let Some(filename) =
+                                    Path::new(entry.clone().path().as_os_str()).file_name()
+                                {
+                                    let tagged_file = Probe::open(entry.clone().path())
+                                        .expect("ERROR: Bad path provided!")
+                                        .read()
+                                        .expect("ERROR: Failed to read file!");
+                                    let duration: Duration = tagged_file.properties().duration();
+                                    let _tag = match tagged_file.primary_tag() {
+                                        Some(primary_tag) => {
+                                            let new_entry: Song = Song {
+                                                file_path: entry.path().display().to_string(),
+                                                file_name: filename.to_str().unwrap().to_string(),
+                                                file_type: ext.to_str().unwrap().to_string(),
+                                                is_valid: true,
+                                                title: primary_tag
+                                                    .title()
+                                                    .as_deref()
+                                                    .unwrap_or("N/A")
+                                                    .to_string(),
+                                                album: primary_tag
+                                                    .album()
+                                                    .as_deref()
+                                                    .unwrap_or("N/A")
+                                                    .to_string(),
+                                                artist: primary_tag
+                                                    .artist()
+                                                    .as_deref()
+                                                    .unwrap_or("N/A")
+                                                    .to_string(),
+                                                duration: duration,
+                                                genre: primary_tag
+                                                    .genre()
+                                                    .as_deref()
+                                                    .unwrap_or("N/A")
+                                                    .to_string(),
+                                            };
+                                            out.push(new_entry);
+                                        }
+
+                                        // If the "primary" tag doesn't exist, we just grab the
+                                        // first tag we can find. Realistically, a tag reader would likely
+                                        // iterate through the tags to find a suitable one.
+                                        _ => {
+                                            let new_entry: Song = Song {
+                                                file_path: entry.path().display().to_string(),
+                                                file_name: filename.to_str().unwrap().to_string(),
+                                                file_type: ext.to_str().unwrap().to_string(),
+                                                is_valid: true,
+                                                title: filename.to_str().unwrap().to_string(),
+                                                artist: "N/A".to_string(),
+                                                album: "N/A".to_string(),
+                                                duration: duration,
+                                                genre: "N/A".to_string(),
+                                            };
+                                            out.push(new_entry);
+                                        }
+                                    };
+                                }
                             }
                         }
                     }
-                    out.append(&mut song_entries);
                 }
             }
             out
@@ -181,52 +250,30 @@ impl App {
                     AppEvent::AddSingle => {
                         let index = self.search_results.len() - 1 - self.select_index;
 
-                        if let Some(filename) =
-                            Path::new(self.search_results[index].clone().as_str()).file_name()
-                        {
-                            let tagged_file =
-                                lofty::read_from_path(self.search_results[index].clone())?;
-                            let duration: Duration = tagged_file.properties().duration();
-                            if let Ok(fname) = filename.to_owned().into_string() {
-                                self.queue.push((fname, duration));
-                            }
-                        }
-
-                        let path_str = self.search_results[index].clone();
-                        let file = std::fs::File::open(path_str.clone()).unwrap();
+                        let song = self.search_results[index].clone();
+                        let file = std::fs::File::open(song.clone().file_path).unwrap();
                         self.sink
                             .append(rodio::Decoder::new(BufReader::new(file)).unwrap());
+                        self.queue.push(song);
                     }
                     AppEvent::AddAlbum => {
                         let index = self.search_results.len() - 1 - self.select_index;
                         let song = self.search_results[index].clone();
-                        let file_types = [
-                            "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
-                        ];
+                        // let file_types = [
+                        //     "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
+                        // ];
+                        let album_name = song.album;
 
                         // song is the single song
                         let mut queue = Vec::new();
-                        let mut dir = PathBuf::from(song);
-                        dir.pop();
-                        for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
-                            if let Some(ext) = entry.path().extension() {
-                                if file_types.contains(&ext.to_str().unwrap()) {
-                                    let push = entry.path().to_owned();
-                                    queue.push(push.into_os_string().into_string().unwrap());
-                                }
+                        for song in self.search_cache.clone() {
+                            if song.album == album_name {
+                                queue.push(song);
                             }
                         }
-                        for entry in queue {
-                            if let Some(filename) = Path::new(entry.clone().as_str()).file_name() {
-                                let tagged_file = lofty::read_from_path(entry.clone())?;
-                                let duration: Duration = tagged_file.properties().duration();
-                                if let Ok(fname) = filename.to_owned().into_string() {
-                                    self.queue.push((fname, duration));
-                                }
-                            }
-
-                            let path_str = entry.clone();
-                            let file = std::fs::File::open(path_str.clone()).unwrap();
+                        for song in queue {
+                            self.queue.push(song.clone());
+                            let file = std::fs::File::open(song.file_path).unwrap();
                             self.sink
                                 .append(rodio::Decoder::new(BufReader::new(file)).unwrap());
                         }
@@ -264,7 +311,7 @@ impl App {
                     AppEvent::MoveForward => {
                         let pos = self.sink.get_pos();
                         if self.queue.len() > 0 {
-                            if pos + SEEK_CHANGE < self.queue[0].1 {
+                            if pos + SEEK_CHANGE < self.queue[0].duration {
                                 let _ = self.sink.try_seek(pos + SEEK_CHANGE);
                             }
                         }
@@ -277,6 +324,27 @@ impl App {
                                 let _ = self.sink.try_seek(pos - SEEK_CHANGE);
                             } else {
                                 let _ = self.sink.try_seek(Duration::from_millis(0));
+                            }
+                        }
+                    }
+                    AppEvent::RefreshResults => {
+                        if self.query.len() > 0 {
+                            let matcher = SkimMatcherV2::default();
+                            let mut entries_with_score: Vec<(Song, i64)> = Vec::new();
+                            for entry in self.search_cache.clone() {
+                                if let Some(score) = matcher
+                                    .fuzzy_match(entry.file_path.as_str(), self.query.as_str())
+                                {
+                                    if score > 0 {
+                                        entries_with_score.push((entry, score));
+                                    };
+                                }
+                            }
+
+                            entries_with_score.sort_by(|a, b| b.1.cmp(&a.1));
+                            self.search_results = Vec::new();
+                            for entry in entries_with_score {
+                                self.search_results.push(entry.0)
                             }
                         }
                     }
@@ -322,6 +390,7 @@ impl App {
                 KeyCode::Char('a') => {
                     if self.mode == Mode::Select {
                         self.events.send(AppEvent::AddAlbum);
+                        self.events.send(AppEvent::Resume)
                     }
                 }
                 KeyCode::Char('v') => {
@@ -361,50 +430,12 @@ impl App {
                         self.query.clear();
                     } else {
                         self.query.pop();
-
-                        if self.query.len() > 0 {
-                            let matcher = SkimMatcherV2::default();
-                            let mut entries_with_score: Vec<(String, i64)> = Vec::new();
-                            for entry in self.search_cache.clone() {
-                                if let Some(score) =
-                                    matcher.fuzzy_match(entry.as_str(), self.query.as_str())
-                                {
-                                    if score > 0 {
-                                        entries_with_score.push((entry, score));
-                                    };
-                                }
-                            }
-
-                            entries_with_score.sort_by(|a, b| b.1.cmp(&a.1));
-                            self.search_results = Vec::new();
-                            for entry in entries_with_score {
-                                self.search_results.push(entry.0)
-                            }
-                        }
                     }
                 }
                 KeyCode::Esc => {}
                 _ => {
                     self.query.push_str(&key_event.code.to_string());
-                    if self.query.len() > 0 {
-                        let matcher = SkimMatcherV2::default();
-                        let mut entries_with_score: Vec<(String, i64)> = Vec::new();
-                        for entry in self.search_cache.clone() {
-                            if let Some(score) =
-                                matcher.fuzzy_match(entry.as_str(), self.query.as_str())
-                            {
-                                if score > 0 {
-                                    entries_with_score.push((entry, score));
-                                };
-                            }
-                        }
-
-                        entries_with_score.sort_by(|a, b| b.1.cmp(&a.1));
-                        self.search_results = Vec::new();
-                        for entry in entries_with_score {
-                            self.search_results.push(entry.0)
-                        }
-                    }
+                    self.events.send(AppEvent::RefreshResults);
                 }
             }
         }
