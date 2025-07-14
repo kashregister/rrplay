@@ -6,7 +6,7 @@ use ratatui::{
     layout::{Alignment, Rect},
     prelude::*,
     style::{Color, Stylize},
-    widgets::{Block, BorderType, Borders, Gauge, Paragraph, Widget},
+    widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph, Widget, Wrap},
 };
 
 fn format_seconds(seconds: u64) -> (u64, u64) {
@@ -160,7 +160,7 @@ impl Widget for &App {
                                         if i == 0 {
                                             Modifier::SLOW_BLINK
                                         } else {
-                                        Modifier::DIM
+                                            Modifier::DIM
                                         }
                                     } else {
                                         Modifier::DIM
@@ -186,39 +186,11 @@ impl Widget for &App {
                 .centered()
                 .render(top_layout[i], buf);
         }
-        // Paragraph::new(detailed_results.0)
-        //     .block(borderless_block.clone())
-        //     .centered()
-        //     .render(top_layout[0], buf);
-        //
-        // Paragraph::new(detailed_results.1)
-        //     .block(borderless_block.clone())
-        //     .centered()
-        //     .render(top_layout[1], buf);
-        // Paragraph::new(detailed_results.2)
-        //     .block(borderless_block.clone())
-        //     .centered()
-        //     .render(top_layout[2], buf);
-        //
-        // Paragraph::new(detailed_results.3)
-        //     .block(borderless_block.clone())
-        //     .centered()
-        //     .render(top_layout[3], buf);
-        //
-        // Paragraph::new(detailed_results.4)
-        //     .block(borderless_block.clone())
-        //     .centered()
-        //     .render(top_layout[4], buf);
-        // Paragraph::new(detailed_results.5)
-        //     .block(borderless_block.clone())
-        //     .centered()
-        //     .render(top_layout[5], buf);
 
         Paragraph::new("")
             .block(title_block)
             .centered()
             .render(layout[0], buf);
-        // temp_paragraph.render();
         let mode_block = if self.mode == Mode::Search {
             Block::bordered()
                 .title("Query")
@@ -227,7 +199,6 @@ impl Widget for &App {
                 .border_style(Style::new().yellow())
         } else if self.mode == Mode::Sitback {
             Block::bordered()
-                // .title("Sitback")
                 .title_alignment(Alignment::Center)
                 .border_type(BorderType::Plain)
         } else if self.mode == Mode::Select {
@@ -321,6 +292,53 @@ impl Widget for &App {
                 .centered()
                 .render(bottom_layout[0], buf);
         };
+
+        if self.help_display {
+            let help_block = Block::new()
+                .title("Help desk")
+                .title_style(Style::new().white().bold())
+                .borders(Borders::ALL)
+                .border_style(Style::new());
+            let popup_area = Rect {
+                x: area.width / 4,
+                y: area.height / 3,
+                width: area.width / 2,
+                height: area.height / 3,
+            };
+            Clear.render(popup_area, buf);
+
+            if let Some(sources_ok) = self.sources.clone() {
+                let mut sources: Vec<Line<'_>> = sources_ok
+                    .into_iter()
+                    .map(|s| {
+                        Span::styled(
+                            s.0,
+                            Style::default().fg(if s.1 { Color::Green } else { Color::Red }),
+                        )
+                        .into()
+                    })
+                    .collect();
+                let mut start = Vec::from([Span::styled("Sources:", Style::default()).into()]);
+                start.append(&mut sources);
+                _ = Paragraph::new(start)
+                    .style(Style::new())
+                    .block(help_block.clone())
+                    .render(popup_area, buf);
+            } else {
+                Paragraph::new({
+                    let mut ret = "No sources found...\nAdd some!\nFile location:\n".to_string();
+                    if let Some(cfg_dir) = dirs::config_dir() {
+                        let str = cfg_dir.join("rrplay").join("config").display().to_string();
+                        ret.push_str(&str);
+                    }
+                    ret
+                })
+                .wrap(Wrap { trim: true })
+                .style(Style::new())
+                .block(help_block)
+                .render(popup_area, buf);
+            }
+        }
 
         // status_paragraph.render(bottom_layout[0], buf);
     }
