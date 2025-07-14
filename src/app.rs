@@ -10,7 +10,6 @@ use ratatui::{
 use rodio::{OutputStream, Sink};
 use std::io::BufReader;
 use std::path::Path;
-use std::process::exit;
 use std::time::Duration;
 use walkdir::WalkDir;
 
@@ -45,6 +44,7 @@ pub struct App {
     pub sink: Sink,
     pub stream: OutputStream,
     pub terminal_size: (u16, u16),
+    pub help_display: bool,
     // pub stream_handle: OutputStreamHandle,
 }
 
@@ -71,6 +71,7 @@ impl Default for App {
             sink: Sink::try_new(&OutputStream::try_default().unwrap().1).unwrap(),
             stream: OutputStream::try_default().unwrap().0,
             terminal_size: (0, 0),
+            help_display: true,
         }
     }
 }
@@ -85,21 +86,24 @@ impl App {
         if let Some(_) = out.sources.clone() {
             out.search_cache = App::search_directories(out.sources.clone());
         } else {
-            exit(1);
         }
         out
     }
 
     pub fn config_check_file_exists() -> bool {
         if let Some(cfg_dir) = dirs::config_dir() {
-            let config_file = cfg_dir.join("rrplay").join("config");
-            if !config_file.is_file() {
-                return false;
+            let exists = cfg_dir.join("rrplay").join("config");
+            if !exists.is_file() {
+                let mut config_file = cfg_dir.join("rrplay");
+                std::fs::create_dir_all(config_file.clone()).unwrap();
+                config_file = cfg_dir.join("rrplay/config");
+                std::fs::write(config_file, "").unwrap();
+                true
             } else {
-                return true;
+                true
             }
         } else {
-            return false;
+            false
         }
     }
 
@@ -109,7 +113,7 @@ impl App {
                 let config_file = cfg_dir.join("rrplay").join("config");
                 let file_contents: String =
                     std::fs::read_to_string(config_file).unwrap_or_else(|_| "~~~~".to_string());
-                if file_contents == "~~~~" {
+                if file_contents == "~~~~" || file_contents == "" {
                     return None;
                 }
                 let paths = file_contents.split("\n");
@@ -131,77 +135,76 @@ impl App {
             None
         }
     }
-    pub fn search_directories(sources: Option<Vec<(String, bool)>>) -> Vec<Song> {
-        if let Some(sources) = sources {
+    pub fn search_directories(check_sources: Option<Vec<(String, bool)>>) -> Vec<Song> {
+        if let Some(sources) = check_sources {
             let mut out = Vec::new();
-            for source in sources {
-                if source.1 == true {
-                    let file_types = [
-                        "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
-                    ];
+            let source_filter: Vec<(String, bool)> = sources.into_iter().filter(|x| x.1).collect();
+            for source in source_filter {
+                let file_types = [
+                    "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
+                ];
 
-                    for entry in WalkDir::new(source.0).into_iter().filter_map(|e| e.ok()) {
-                        if let Some(ext) = entry.path().extension() {
-                            if file_types.contains(&ext.to_str().unwrap_or_else(|| "No ext")) {
-                                if let Some(filename) =
-                                    Path::new(entry.clone().path().as_os_str()).file_name()
-                                {
-                                    let tagged_file = Probe::open(entry.clone().path())
-                                        .expect("ERROR: Bad path provided!")
-                                        .read()
-                                        .expect("ERROR: Failed to read file!");
-                                    let duration: Duration = tagged_file.properties().duration();
-                                    let _tag = match tagged_file.primary_tag() {
-                                        Some(primary_tag) => {
-                                            let new_entry: Song = Song {
-                                                file_path: entry.path().display().to_string(),
-                                                file_name: filename.to_str().unwrap().to_string(),
-                                                file_type: ext.to_str().unwrap().to_string(),
-                                                is_valid: true,
-                                                title: primary_tag
-                                                    .title()
-                                                    .as_deref()
-                                                    .unwrap_or_else(|| "N/A")
-                                                    .to_string(),
-                                                album: primary_tag
-                                                    .album()
-                                                    .as_deref()
-                                                    .unwrap_or_else(|| "N/A")
-                                                    .to_string(),
-                                                artist: primary_tag
-                                                    .artist()
-                                                    .as_deref()
-                                                    .unwrap_or_else(|| "N/A")
-                                                    .to_string(),
-                                                duration: duration,
-                                                genre: primary_tag
-                                                    .genre()
-                                                    .as_deref()
-                                                    .unwrap_or_else(|| "N/A")
-                                                    .to_string(),
-                                            };
-                                            out.push(new_entry);
-                                        }
+                for entry in WalkDir::new(source.0).into_iter().filter_map(|e| e.ok()) {
+                    if let Some(ext) = entry.path().extension() {
+                        if file_types.contains(&ext.to_str().unwrap_or_else(|| "No ext")) {
+                            if let Some(filename) =
+                                Path::new(entry.clone().path().as_os_str()).file_name()
+                            {
+                                let tagged_file = Probe::open(entry.clone().path())
+                                    .expect("ERROR: Bad path provided!")
+                                    .read()
+                                    .expect("ERROR: Failed to read file!");
+                                let duration: Duration = tagged_file.properties().duration();
+                                let _tag = match tagged_file.primary_tag() {
+                                    Some(primary_tag) => {
+                                        let new_entry: Song = Song {
+                                            file_path: entry.path().display().to_string(),
+                                            file_name: filename.to_str().unwrap().to_string(),
+                                            file_type: ext.to_str().unwrap().to_string(),
+                                            is_valid: true,
+                                            title: primary_tag
+                                                .title()
+                                                .as_deref()
+                                                .unwrap_or_else(|| "N/A")
+                                                .to_string(),
+                                            album: primary_tag
+                                                .album()
+                                                .as_deref()
+                                                .unwrap_or_else(|| "N/A")
+                                                .to_string(),
+                                            artist: primary_tag
+                                                .artist()
+                                                .as_deref()
+                                                .unwrap_or_else(|| "N/A")
+                                                .to_string(),
+                                            duration: duration,
+                                            genre: primary_tag
+                                                .genre()
+                                                .as_deref()
+                                                .unwrap_or_else(|| "N/A")
+                                                .to_string(),
+                                        };
+                                        out.push(new_entry);
+                                    }
 
-                                        // If the "primary" tag doesn't exist, we just grab the
-                                        // first tag we can find. Realistically, a tag reader would likely
-                                        // iterate through the tags to find a suitable one.
-                                        _ => {
-                                            let new_entry: Song = Song {
-                                                file_path: entry.path().display().to_string(),
-                                                file_name: filename.to_str().unwrap().to_string(),
-                                                file_type: ext.to_str().unwrap().to_string(),
-                                                is_valid: true,
-                                                title: filename.to_str().unwrap().to_string(),
-                                                artist: "N/A".to_string(),
-                                                album: "N/A".to_string(),
-                                                duration: duration,
-                                                genre: "N/A".to_string(),
-                                            };
-                                            out.push(new_entry);
-                                        }
-                                    };
-                                }
+                                    // If the "primary" tag doesn't exist, we just grab the
+                                    // first tag we can find. Realistically, a tag reader would likely
+                                    // iterate through the tags to find a suitable one.
+                                    _ => {
+                                        let new_entry: Song = Song {
+                                            file_path: entry.path().display().to_string(),
+                                            file_name: filename.to_str().unwrap().to_string(),
+                                            file_type: ext.to_str().unwrap().to_string(),
+                                            is_valid: true,
+                                            title: filename.to_str().unwrap().to_string(),
+                                            artist: "N/A".to_string(),
+                                            album: "N/A".to_string(),
+                                            duration: duration,
+                                            genre: "N/A".to_string(),
+                                        };
+                                        out.push(new_entry);
+                                    }
+                                };
                             }
                         }
                     }
@@ -250,6 +253,7 @@ impl App {
                             self.select_index += 1;
                         }
                     }
+                    AppEvent::HelpDesk => self.help_display = !self.help_display,
                     AppEvent::MoveDown => {
                         if self.select_index > 0 {
                             self.select_index -= 1;
@@ -376,90 +380,107 @@ impl App {
 
     /// Handles the key events and updates the state of [`App`].
     pub fn handle_key_events(&mut self, key_event: KeyEvent) -> color_eyre::Result<()> {
-        match key_event.code {
-            KeyCode::Esc => self.events.send(AppEvent::Escape),
-            KeyCode::Enter => {
-                if self.mode == Mode::Select {
-                    self.events.send(AppEvent::AddSingle);
-                    self.events.send(AppEvent::Resume)
-                } else if self.mode == Mode::Search {
-                    self.events.send(AppEvent::Select)
-                }
-            }
-            _ => {}
-        }
-        if self.mode != Mode::Search {
+        if !self.help_display {
             match key_event.code {
-                KeyCode::Char('q') => self.events.send(AppEvent::Quit),
-                KeyCode::Char('j') => self.events.send(AppEvent::MoveDown),
-                KeyCode::Char('k') => self.events.send(AppEvent::MoveUp),
-                KeyCode::Char('p') => {
-                    if self.mode == Mode::Sitback {
-                        if self.sink.is_paused() == true {
-                            self.events.send(AppEvent::Resume);
-                        } else {
-                            self.events.send(AppEvent::Pause);
+                KeyCode::Esc => self.events.send(AppEvent::Escape),
+                KeyCode::Enter => {
+                    if self.mode == Mode::Select {
+                        self.events.send(AppEvent::AddSingle);
+                        self.events.send(AppEvent::Resume)
+                    } else if self.mode == Mode::Search {
+                        self.events.send(AppEvent::Select)
+                    }
+                }
+                _ => {}
+            }
+            if self.mode != Mode::Search {
+                match key_event.code {
+                    // Select only
+                    KeyCode::Char('j') if self.mode == Mode::Select => {
+                        self.events.send(AppEvent::MoveDown)
+                    }
+                    KeyCode::Char('k') if self.mode == Mode::Select => {
+                        self.events.send(AppEvent::MoveUp)
+                    }
+                    KeyCode::Char('q') => self.events.send(AppEvent::Quit),
+                    KeyCode::Char('p') => {
+                        if self.mode == Mode::Sitback {
+                            if self.sink.is_paused() == true {
+                                self.events.send(AppEvent::Resume);
+                            } else {
+                                self.events.send(AppEvent::Pause);
+                            }
                         }
                     }
-                }
 
-                KeyCode::Char('s') => {
-                    self.events.send(AppEvent::Skip);
-                }
+                    KeyCode::Char('s') => {
+                        self.events.send(AppEvent::Skip);
+                    }
 
-                KeyCode::Char('a') => {
-                    if self.mode == Mode::Select {
-                        self.events.send(AppEvent::AddAlbum);
-                        self.events.send(AppEvent::Resume)
+                    KeyCode::Char('a') => {
+                        if self.mode == Mode::Select {
+                            self.events.send(AppEvent::AddAlbum);
+                            self.events.send(AppEvent::Resume)
+                        }
+                    }
+                    KeyCode::Char('v') => {
+                        self.events.send(AppEvent::VolumeDown);
+                    }
+                    KeyCode::Char('h') => {
+                        self.events.send(AppEvent::MoveBackward);
+                    }
+                    KeyCode::Char('l') => {
+                        self.events.send(AppEvent::MoveForward);
+                    }
+                    KeyCode::Char('V') => {
+                        self.events.send(AppEvent::VolumeUp);
+                    }
+                    KeyCode::Char(':') => {
+                        self.events.send(AppEvent::HelpDesk);
+                    }
+
+                    KeyCode::Char('c' | 'C') => {
+                        if key_event.modifiers == KeyModifiers::CONTROL {
+                            self.events.send(AppEvent::Quit)
+                        } else {
+                            self.events.send(AppEvent::ClearQueue);
+                        }
+                    }
+
+                    KeyCode::Char('/') => self.events.send(AppEvent::Search),
+
+                    // Other handlers you could add here.
+                    _ => {}
+                }
+            } else {
+                match key_event.code {
+                    KeyCode::Enter => {}
+                    KeyCode::Char(' ') => {
+                        self.query.push_str(" ");
+                        self.events.send(AppEvent::RefreshResults);
+                    }
+                    KeyCode::Backspace => {
+                        if KeyModifiers::ALT == key_event.modifiers {
+                            self.query.clear();
+                        } else {
+                            self.query.pop();
+                            self.events.send(AppEvent::RefreshResults);
+                        }
+                    }
+                    KeyCode::Esc => {}
+                    _ => {
+                        self.query.push_str(&key_event.code.to_string());
+                        self.events.send(AppEvent::RefreshResults);
                     }
                 }
-                KeyCode::Char('v') => {
-                    self.events.send(AppEvent::VolumeDown);
-                }
-                KeyCode::Char('h') => {
-                    self.events.send(AppEvent::MoveBackward);
-                }
-                KeyCode::Char('l') => {
-                    self.events.send(AppEvent::MoveForward);
-                }
-                KeyCode::Char('V') => {
-                    self.events.send(AppEvent::VolumeUp);
-                }
-
-                KeyCode::Char('c' | 'C') => {
-                    if key_event.modifiers == KeyModifiers::CONTROL {
-                        self.events.send(AppEvent::Quit)
-                    } else {
-                        self.events.send(AppEvent::ClearQueue);
-                    }
-                }
-
-                KeyCode::Char('/') => self.events.send(AppEvent::Search),
-
-                // Other handlers you could add here.
-                _ => {}
             }
         } else {
             match key_event.code {
-                KeyCode::Enter => {}
-                KeyCode::Char(' ') => {
-                    self.query.push_str(" ");
-                }
-                KeyCode::Backspace => {
-                    if KeyModifiers::ALT == key_event.modifiers {
-                        self.query.clear();
-                    } else {
-                        self.query.pop();
-                    }
-                }
-                KeyCode::Esc => {}
-                _ => {
-                    self.query.push_str(&key_event.code.to_string());
-                    self.events.send(AppEvent::RefreshResults);
-                }
+                KeyCode::Esc => self.events.send(AppEvent::HelpDesk),
+                KeyCode::Char('q') => self.events.send(AppEvent::HelpDesk),
+                _ => {}
             }
         }
-
         Ok(())
     }
 

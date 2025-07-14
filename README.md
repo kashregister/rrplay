@@ -6,28 +6,28 @@ Aims for fast navigation which i missed from most players.
 
 # Sources
 
-(Still wip in v2, please manually make your config folder and the file for now)
-
-You are prompted to choose your source folder when first opening the program.\
-example:
-
-```bash
-/home/your_name/Music
-```
+Each time you start up rrplay, a popup window will list your sources and the
+location of the configuration file.
 
 Multiple sources can be added simply by listing each one on a seperate line.\
 Sources will be colored either green or red depending whether they are valid or
 not.
+
+```bash
+/home/your_name/Music
+/home/your_name/Music2
+/home/your_name/My_folder
+```
 
 # Navigation:
 
 ### Keybinds
 
 **Modes:**\
-: Command mode\
 / Search mode\
 (Enter) Select mode (While being in search mode)\
-(Esc) Sitback mode (Just shows your queue and other info)
+(Esc) Sitback mode (Queue and related)\
+: Help desk (Popup that lists your sources)
 
 **General:**\
 p - Pause\
@@ -39,8 +39,8 @@ h - move backwards 5s\
 l - move forward 5s
 
 **Select mode:**\
-Enter - Add single to queue\
-a - Add album to queue
+Enter - Add single to the queue\
+a - Add album to the queue
 
 ### Searching
 

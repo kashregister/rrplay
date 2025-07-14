@@ -48,6 +48,7 @@ pub enum AppEvent {
     Skip,
     MoveForward,
     MoveBackward,
+    HelpDesk,
 }
 
 /// Terminal event handler.
