@@ -44,6 +44,7 @@ pub struct App {
     pub mode: Mode,
     pub sink: Sink,
     pub stream: OutputStream,
+    pub terminal_size: (u16, u16),
     // pub stream_handle: OutputStreamHandle,
 }
 
@@ -69,6 +70,7 @@ impl Default for App {
             sources: App::check_config_validity(),
             sink: Sink::try_new(&OutputStream::try_default().unwrap().1).unwrap(),
             stream: OutputStream::try_default().unwrap().0,
+            terminal_size: (0, 0),
         }
     }
 }
@@ -214,6 +216,8 @@ impl App {
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> color_eyre::Result<()> {
         while self.running {
             terminal.draw(|frame| frame.render_widget(&self, frame.area()))?;
+            let size = terminal.size().unwrap();
+            self.terminal_size = (size.width, size.height);
             match self.events.next().await? {
                 Event::Tick => self.tick(),
                 Event::Crossterm(event) => match event {
