@@ -1,5 +1,7 @@
 use crate::app::App;
 use crate::app::Mode;
+use crate::app::Song;
+use crossterm::terminal;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Rect},
@@ -91,22 +93,8 @@ impl Widget for &App {
         };
         let borderless_block = Block::new().borders(Borders::NONE);
 
-        let detailed_results: (
-            Vec<Line<'_>>,
-            Vec<Line<'_>>,
-            Vec<Line<'_>>,
-            Vec<Line<'_>>,
-            Vec<Line<'_>>,
-            Vec<Line<'_>>,
-        ) = {
-            let mut tmp_results: (
-                Vec<Line<'_>>,
-                Vec<Line<'_>>,
-                Vec<Line<'_>>,
-                Vec<Line<'_>>,
-                Vec<Line<'_>>,
-                Vec<Line<'_>>,
-            ) = (
+        let array_test: Vec<Vec<Line<'_>>> = {
+            let mut tmp_results: Vec<Vec<Line<'_>>> = vec![
                 vec![
                     "".into(),
                     Span::styled("Index", Style::default().add_modifier(Modifier::BOLD)).into(),
@@ -131,158 +119,100 @@ impl Widget for &App {
                     "".into(),
                     Span::styled("Genre", Style::default().add_modifier(Modifier::BOLD)).into(),
                 ],
-            );
-            let to_iter = if self.mode == Mode::Sitback {
+            ];
+            let terminal_size = terminal::size().unwrap();
+            let mut to_iter: Vec<Song> = if self.mode == Mode::Sitback {
                 self.queue.clone()
             } else {
                 self.search_results.clone()
             };
-            for (i, song) in to_iter.iter().enumerate() {
-                if i as i32 == self.search_results.len() as i32 - 1 - self.select_index as i32
-                    && self.mode == Mode::Select
-                {
-                    tmp_results.0.push(
-                        Span::styled(i.to_string(), Style::default().add_modifier(Modifier::BOLD))
-                            .into(),
-                    );
-                    tmp_results.1.push(
-                        Span::styled(
-                            song.title.clone(),
-                            Style::default().add_modifier(Modifier::BOLD),
-                        )
-                        .into(),
-                    );
-                    tmp_results.2.push(
-                        Span::styled(
-                            generate_label(song.duration.as_secs()),
-                            Style::default().add_modifier(Modifier::BOLD),
-                        )
-                        .into(),
-                    );
-
-                    tmp_results.3.push(
-                        Span::styled(
-                            song.artist.clone(),
-                            Style::default().add_modifier(Modifier::BOLD),
-                        )
-                        .into(),
-                    );
-                    tmp_results.4.push(
-                        Span::styled(
-                            song.album.clone(),
-                            Style::default().add_modifier(Modifier::BOLD),
-                        )
-                        .into(),
-                    );
-                    tmp_results.5.push(
-                        Span::styled(
-                            song.genre.clone(),
-                            Style::default().add_modifier(Modifier::BOLD),
-                        )
-                        .into(),
-                    )
+            to_iter.truncate({
+                if terminal_size.1 > 10 {
+                    (terminal_size.1 - 6).into()
                 } else {
-                    tmp_results.0.push(
-                        Span::styled(i.to_string(), Style::default().add_modifier(Modifier::DIM))
-                            .into(),
-                    );
-                    tmp_results.1.push(
-                        Span::styled(
-                            song.title.clone(),
-                            Style::default().add_modifier(Modifier::DIM),
-                        )
-                        .into(),
-                    );
-                    tmp_results.2.push(
-                        Span::styled(
-                            generate_label(song.duration.as_secs()),
-                            Style::default().add_modifier(Modifier::DIM),
-                        )
-                        .into(),
-                    );
+                    terminal_size.1.into()
+                }
+            });
 
-                    tmp_results.3.push(
+            for (i, song) in to_iter.iter().enumerate() {
+                for (n, item) in &mut tmp_results.iter_mut().enumerate() {
+                    item.push(
                         Span::styled(
-                            song.artist.clone(),
-                            Style::default().add_modifier(Modifier::DIM),
-                        )
-                        .into(),
-                    );
-                    tmp_results.4.push(
-                        Span::styled(
-                            song.album.clone(),
-                            Style::default().add_modifier(Modifier::DIM),
-                        )
-                        .into(),
-                    );
-                    tmp_results.5.push(
-                        Span::styled(
-                            song.genre.clone(),
-                            Style::default().add_modifier(Modifier::DIM),
+                            {
+                                match n {
+                                    0 => (i + 1 as usize).to_string(),
+                                    1 => song.title.clone(),
+                                    2 => generate_label(song.duration.as_secs()),
+                                    3 => song.artist.clone(),
+                                    4 => song.album.clone(),
+                                    5 => song.genre.clone(),
+                                    _ => "Undefined".to_string(),
+                                }
+                            },
+                            Style::default()
+                                .add_modifier({
+                                    if i as i32
+                                        == self.search_results.len() as i32
+                                            - 1
+                                            - self.select_index as i32
+                                        && self.mode == Mode::Select
+                                        || self.mode == Mode::Sitback
+                                    {
+                                        Modifier::BOLD
+                                    } else {
+                                        Modifier::DIM
+                                    }
+                                })
+                                .fg({
+                                    if song.is_valid {
+                                        Color::Green
+                                    } else {
+                                        Color::Red
+                                    }
+                                }),
                         )
                         .into(),
                     )
                 }
             }
-
-            tmp_results
-            // // Index
-            // Constraint::Percentage(10),
-            // // File Name
-            // Constraint::Percentage(20),
-            // // Duration
-            // Constraint::Percentage(10),
-            // // Artist
-            // Constraint::Percentage(20),
-            // // Album
-            // Constraint::Percentage(20),
-            // // Genre
-            // Constraint::Percentage(20),
+            tmp_results.clone()
         };
-        Paragraph::new(detailed_results.0)
-            .block(borderless_block.clone())
-            .fg(Color::White)
-            .bg(Color::Black)
-            .centered()
-            .render(top_layout[0], buf);
-
-        Paragraph::new(detailed_results.1)
-            .block(borderless_block.clone())
-            .fg(Color::White)
-            .bg(Color::Black)
-            .centered()
-            .render(top_layout[1], buf);
-        Paragraph::new(detailed_results.2)
-            .block(borderless_block.clone())
-            .fg(Color::White)
-            .bg(Color::Black)
-            .centered()
-            .render(top_layout[2], buf);
-
-        Paragraph::new(detailed_results.3)
-            .block(borderless_block.clone())
-            .fg(Color::White)
-            .bg(Color::Black)
-            .centered()
-            .render(top_layout[3], buf);
-
-        Paragraph::new(detailed_results.4)
-            .block(borderless_block.clone())
-            .fg(Color::White)
-            .bg(Color::Black)
-            .centered()
-            .render(top_layout[4], buf);
-        Paragraph::new(detailed_results.5)
-            .block(borderless_block.clone())
-            .fg(Color::White)
-            .bg(Color::Black)
-            .centered()
-            .render(top_layout[5], buf);
+        for (i, n) in array_test.iter().enumerate() {
+            Paragraph::new(n.clone())
+                .block(borderless_block.clone())
+                .centered()
+                .render(top_layout[i], buf);
+        }
+        // Paragraph::new(detailed_results.0)
+        //     .block(borderless_block.clone())
+        //     .centered()
+        //     .render(top_layout[0], buf);
+        //
+        // Paragraph::new(detailed_results.1)
+        //     .block(borderless_block.clone())
+        //     .centered()
+        //     .render(top_layout[1], buf);
+        // Paragraph::new(detailed_results.2)
+        //     .block(borderless_block.clone())
+        //     .centered()
+        //     .render(top_layout[2], buf);
+        //
+        // Paragraph::new(detailed_results.3)
+        //     .block(borderless_block.clone())
+        //     .centered()
+        //     .render(top_layout[3], buf);
+        //
+        // Paragraph::new(detailed_results.4)
+        //     .block(borderless_block.clone())
+        //     .centered()
+        //     .render(top_layout[4], buf);
+        // Paragraph::new(detailed_results.5)
+        //     .block(borderless_block.clone())
+        //     .centered()
+        //     .render(top_layout[5], buf);
 
         Paragraph::new("")
             .block(title_block)
-            .fg(Color::White)
-            .bg(Color::Black)
             .centered()
             .render(layout[0], buf);
         // temp_paragraph.render();

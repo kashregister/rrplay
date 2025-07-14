@@ -105,7 +105,11 @@ impl App {
         if App::config_check_file_exists() {
             if let Some(cfg_dir) = dirs::config_dir() {
                 let config_file = cfg_dir.join("rrplay").join("config");
-                let file_contents = std::fs::read_to_string(config_file).unwrap();
+                let file_contents: String =
+                    std::fs::read_to_string(config_file).unwrap_or_else(|_| "~~~~".to_string());
+                if file_contents == "~~~~" {
+                    return None;
+                }
                 let paths = file_contents.split("\n");
                 let mut output: Vec<(String, bool)> = Vec::new();
                 for path in paths {
@@ -136,7 +140,7 @@ impl App {
 
                     for entry in WalkDir::new(source.0).into_iter().filter_map(|e| e.ok()) {
                         if let Some(ext) = entry.path().extension() {
-                            if file_types.contains(&ext.to_str().unwrap()) {
+                            if file_types.contains(&ext.to_str().unwrap_or_else(|| "No ext")) {
                                 if let Some(filename) =
                                     Path::new(entry.clone().path().as_os_str()).file_name()
                                 {
@@ -155,23 +159,23 @@ impl App {
                                                 title: primary_tag
                                                     .title()
                                                     .as_deref()
-                                                    .unwrap_or("N/A")
+                                                    .unwrap_or_else(|| "N/A")
                                                     .to_string(),
                                                 album: primary_tag
                                                     .album()
                                                     .as_deref()
-                                                    .unwrap_or("N/A")
+                                                    .unwrap_or_else(|| "N/A")
                                                     .to_string(),
                                                 artist: primary_tag
                                                     .artist()
                                                     .as_deref()
-                                                    .unwrap_or("N/A")
+                                                    .unwrap_or_else(|| "N/A")
                                                     .to_string(),
                                                 duration: duration,
                                                 genre: primary_tag
                                                     .genre()
                                                     .as_deref()
-                                                    .unwrap_or("N/A")
+                                                    .unwrap_or_else(|| "N/A")
                                                     .to_string(),
                                             };
                                             out.push(new_entry);
@@ -250,11 +254,20 @@ impl App {
                     AppEvent::AddSingle => {
                         let index = self.search_results.len() - 1 - self.select_index;
 
-                        let song = self.search_results[index].clone();
-                        let file = std::fs::File::open(song.clone().file_path).unwrap();
-                        self.sink
-                            .append(rodio::Decoder::new(BufReader::new(file)).unwrap());
-                        self.queue.push(song);
+                        let song = &self.search_results[index];
+
+                        if Path::new(&song.file_path).is_file() {
+                            let file = std::fs::File::open(song.clone().file_path).unwrap();
+
+                            if let Ok(decoder) = rodio::Decoder::new(BufReader::new(file)) {
+                                self.sink.append(decoder);
+                                self.queue.push(song.clone());
+                            } else {
+                                self.search_results[index].is_valid = false;
+                            }
+                        } else {
+                            self.search_results[index].is_valid = false;
+                        }
                     }
                     AppEvent::AddAlbum => {
                         let index = self.search_results.len() - 1 - self.select_index;
@@ -265,17 +278,20 @@ impl App {
                         let album_name = song.album;
 
                         // song is the single song
-                        let mut queue = Vec::new();
-                        for song in self.search_cache.clone() {
+                        for song in &mut self.search_cache {
                             if song.album == album_name {
-                                queue.push(song);
+                                if Path::new(&song.file_path).is_file() {
+                                    let file = std::fs::File::open(song.clone().file_path).unwrap();
+                                    if let Ok(decoder) = rodio::Decoder::new(BufReader::new(file)) {
+                                        self.sink.append(decoder);
+                                        self.queue.push(song.clone());
+                                    } else {
+                                        song.is_valid = false;
+                                    }
+                                } else {
+                                    song.is_valid = false;
+                                }
                             }
-                        }
-                        for song in queue {
-                            self.queue.push(song.clone());
-                            let file = std::fs::File::open(song.file_path).unwrap();
-                            self.sink
-                                .append(rodio::Decoder::new(BufReader::new(file)).unwrap());
                         }
                     }
                     AppEvent::Resume => {
