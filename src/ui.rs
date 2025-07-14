@@ -1,7 +1,6 @@
 use crate::app::App;
 use crate::app::Mode;
 use crate::app::Song;
-use crossterm::terminal;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Rect},
@@ -120,17 +119,16 @@ impl Widget for &App {
                     Span::styled("Genre", Style::default().add_modifier(Modifier::BOLD)).into(),
                 ],
             ];
-            let terminal_size = terminal::size().unwrap();
             let mut to_iter: Vec<Song> = if self.mode == Mode::Sitback {
                 self.queue.clone()
             } else {
                 self.search_results.clone()
             };
             to_iter.truncate({
-                if terminal_size.1 > 10 {
-                    (terminal_size.1 - 6).into()
+                if self.terminal_size.1 > 10 {
+                    (self.terminal_size.1 - 6).into()
                 } else {
-                    terminal_size.1.into()
+                    self.terminal_size.1.into()
                 }
             });
 
@@ -156,9 +154,14 @@ impl Widget for &App {
                                             - 1
                                             - self.select_index as i32
                                         && self.mode == Mode::Select
-                                        || self.mode == Mode::Sitback
                                     {
                                         Modifier::BOLD
+                                    } else if self.mode == Mode::Sitback {
+                                        if i == 0 {
+                                            Modifier::SLOW_BLINK
+                                        } else {
+                                        Modifier::DIM
+                                        }
                                     } else {
                                         Modifier::DIM
                                     }
