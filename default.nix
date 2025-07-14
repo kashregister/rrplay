@@ -5,9 +5,11 @@ pkgs.rustPlatform.buildRustPackage rec {
   cargoLock.lockFile = ./Cargo.lock;
   src = pkgs.lib.cleanSource ./.;
 
-  # buildInputs = with pkgs; [
-  #   rustfmt
-  # ];
+  buildInputs = with pkgs; [
+    dbus
+    alsa-lib
+    pkg-config
+  ];
 
   nativeBuildInputs = with pkgs; [
     dbus
