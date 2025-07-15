@@ -197,13 +197,18 @@ impl Widget for &App {
                 }
             });
 
+            // TODO: Use a scrollable table instead of a paragraph
             for (i, song) in to_iter.iter().enumerate() {
                 for (n, item) in &mut tmp_results.iter_mut().enumerate() {
                     item.push(
                         Span::styled(
                             {
                                 match n {
-                                    0 => song.file_path.clone(),
+                                    0 => {
+                                        let mut cut_str = " ".to_string();
+                                        cut_str.push_str(&song.file_path);
+                                        cut_str
+                                    }
                                     1 => song.title.clone(),
                                     2 => song.artist.clone(),
                                     3 => song.album.clone(),

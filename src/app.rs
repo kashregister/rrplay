@@ -273,44 +273,47 @@ impl App {
                         }
                     }
                     AppEvent::AddSingle => {
-                        let index = self.search_results.len() - 1 - self.select_index;
+                        if self.search_results.len() != 0 {
+                            let index = self.search_results.len() - 1 - self.select_index;
 
-                        let song = &self.search_results[index];
+                            let song = &self.search_results[index];
 
-                        if Path::new(&song.file_path).is_file() {
-                            let file = std::fs::File::open(song.clone().file_path).unwrap();
+                            if Path::new(&song.file_path).is_file() {
+                                let file = std::fs::File::open(song.clone().file_path).unwrap();
 
-                            if let Ok(decoder) = rodio::Decoder::new(BufReader::new(file)) {
-                                self.sink.append(decoder);
-                                self.queue.push(song.clone());
+                                if let Ok(decoder) = rodio::Decoder::new(BufReader::new(file)) {
+                                    self.sink.append(decoder);
+                                    self.queue.push(song.clone());
+                                } else {
+                                    self.search_results[index].is_valid = false;
+                                }
                             } else {
                                 self.search_results[index].is_valid = false;
                             }
-                        } else {
-                            self.search_results[index].is_valid = false;
                         }
                     }
                     AppEvent::AddAlbum => {
-                        let index = self.search_results.len() - 1 - self.select_index;
-                        let song = self.search_results[index].clone();
-                        // let file_types = [
-                        //     "flac", "m4a", "mp3", "wav", "ogg", "opus", "m4p", "aiff", "3gp", "aac",
-                        // ];
-                        let album_name = song.album;
+                        if self.search_results.len() != 0 {
+                            let index = self.search_results.len() - 1 - self.select_index;
+                            let song = self.search_results[index].clone();
+                            let album_name = song.album;
 
-                        // song is the single song
-                        for song in &mut self.search_cache {
-                            if song.album == album_name {
-                                if Path::new(&song.file_path).is_file() {
-                                    let file = std::fs::File::open(song.clone().file_path).unwrap();
-                                    if let Ok(decoder) = rodio::Decoder::new(BufReader::new(file)) {
-                                        self.sink.append(decoder);
-                                        self.queue.push(song.clone());
+                            for song in &mut self.search_cache {
+                                if song.album == album_name {
+                                    if Path::new(&song.file_path).is_file() {
+                                        let file =
+                                            std::fs::File::open(song.clone().file_path).unwrap();
+                                        if let Ok(decoder) =
+                                            rodio::Decoder::new(BufReader::new(file))
+                                        {
+                                            self.sink.append(decoder);
+                                            self.queue.push(song.clone());
+                                        } else {
+                                            song.is_valid = false;
+                                        }
                                     } else {
                                         song.is_valid = false;
                                     }
-                                } else {
-                                    song.is_valid = false;
                                 }
                             }
                         }
