@@ -348,12 +348,17 @@ impl Widget for &App {
                 .title_style(Style::new().white().bold())
                 .borders(Borders::ALL)
                 .border_style(Style::new());
+
             let popup_area = Rect {
                 x: area.width / 4,
                 y: area.height / 3,
                 width: area.width / 2,
                 height: area.height / 3,
             };
+
+            if popup_area.height < 1 {
+                return;
+            }
 
             Clear.render(popup_area, buf);
 
