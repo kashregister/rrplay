@@ -398,7 +398,7 @@ impl Widget for &App {
             hint_popup_area.y += popup_area.height - 1;
             hint_popup_area.x += 1;
 
-            Paragraph::new("Press <Esc> to close this dialog".to_string())
+            Paragraph::new("Press <Esc> to close window".to_string())
                 .alignment(Alignment::Left)
                 .render(hint_popup_area, buf);
         }
