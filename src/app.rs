@@ -45,6 +45,7 @@ pub struct App {
     pub stream: OutputStream,
     pub terminal_size: (u16, u16),
     pub help_display: bool,
+    pub search_by: SearchBy,
     // pub stream_handle: OutputStreamHandle,
 }
 
@@ -53,6 +54,15 @@ pub enum Mode {
     Sitback,
     Search,
     Select,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SearchBy {
+    FilePath,
+    Title,
+    Artist,
+    Album,
+    Genre,
 }
 
 impl Default for App {
@@ -72,6 +82,7 @@ impl Default for App {
             stream: OutputStream::try_default().unwrap().0,
             terminal_size: (0, 0),
             help_display: true,
+            search_by: SearchBy::FilePath,
         }
     }
 }
@@ -358,9 +369,18 @@ impl App {
                             let matcher = SkimMatcherV2::default();
                             let mut entries_with_score: Vec<(Song, i64)> = Vec::new();
                             for entry in self.search_cache.clone() {
-                                if let Some(score) = matcher
-                                    .fuzzy_match(entry.file_path.as_str(), self.query.as_str())
-                                {
+                                if let Some(score) = matcher.fuzzy_match(
+                                    {
+                                        match self.search_by {
+                                            SearchBy::FilePath => entry.file_path.as_str(),
+                                            SearchBy::Title => entry.title.as_str(),
+                                            SearchBy::Artist => entry.artist.as_str(),
+                                            SearchBy::Album => entry.album.as_str(),
+                                            SearchBy::Genre => entry.genre.as_str(),
+                                        }
+                                    },
+                                    self.query.as_str(),
+                                ) {
                                     if score > 0 {
                                         entries_with_score.push((entry, score));
                                     };
@@ -372,6 +392,8 @@ impl App {
                             for entry in entries_with_score {
                                 self.search_results.push(entry.0)
                             }
+                            self.select_index =
+                                (self.search_results.len() as i32 - 1 as i32) as usize;
                         }
                     }
                 },
@@ -440,6 +462,26 @@ impl App {
                     KeyCode::Char(':') => {
                         self.events.send(AppEvent::HelpDesk);
                     }
+                    KeyCode::Char('1') => {
+                        self.search_by = SearchBy::FilePath;
+                        self.events.send(AppEvent::RefreshResults);
+                    }
+                    KeyCode::Char('2') => {
+                        self.search_by = SearchBy::Title;
+                        self.events.send(AppEvent::RefreshResults);
+                    }
+                    KeyCode::Char('3') => {
+                        self.search_by = SearchBy::Artist;
+                        self.events.send(AppEvent::RefreshResults);
+                    }
+                    KeyCode::Char('4') => {
+                        self.search_by = SearchBy::Album;
+                        self.events.send(AppEvent::RefreshResults);
+                    }
+                    KeyCode::Char('5') => {
+                        self.search_by = SearchBy::Genre;
+                        self.events.send(AppEvent::RefreshResults);
+                    }
 
                     KeyCode::Char('c' | 'C') => {
                         if key_event.modifiers == KeyModifiers::CONTROL {
@@ -464,9 +506,14 @@ impl App {
                     KeyCode::Backspace => {
                         if KeyModifiers::ALT == key_event.modifiers {
                             self.query.clear();
+                            self.search_results.clear();
                         } else {
                             self.query.pop();
-                            self.events.send(AppEvent::RefreshResults);
+                            if self.query != "" {
+                                self.events.send(AppEvent::RefreshResults);
+                            } else {
+                                self.search_results.clear();
+                            }
                         }
                     }
                     KeyCode::Esc => {}

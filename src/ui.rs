@@ -1,6 +1,4 @@
-use crate::app::App;
-use crate::app::Mode;
-use crate::app::Song;
+use crate::app::*;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Rect},
@@ -46,18 +44,18 @@ impl Widget for &App {
         let top_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![
-                // Index
-                Constraint::Percentage(5),
-                // File Name
-                Constraint::Percentage(50),
-                // Duration
-                Constraint::Percentage(5),
+                // File path
+                Constraint::Percentage(15),
+                // Title
+                Constraint::Percentage(40),
                 // Artist
                 Constraint::Percentage(15),
                 // Album
                 Constraint::Percentage(15),
                 // Genre
                 Constraint::Percentage(10),
+                // Duration
+                Constraint::Percentage(5),
             ])
             .split(layout[0]);
         let bottom_layout = Layout::default()
@@ -89,32 +87,101 @@ impl Widget for &App {
                 }
             });
         let borderless_block = Block::new().borders(Borders::NONE);
-
         let array_test: Vec<Vec<Line<'_>>> = {
             let mut tmp_results: Vec<Vec<Line<'_>>> = vec![
                 vec![
                     "".into(),
-                    Span::styled("Index", Style::default().add_modifier(Modifier::BOLD)).into(),
+                    Span::styled(
+                        "[1] Path",
+                        Style::default()
+                            .fg(
+                                if self.search_by == SearchBy::FilePath
+                                    && (self.mode == Mode::Search || self.mode == Mode::Select)
+                                {
+                                    Color::Yellow
+                                } else {
+                                    Color::White
+                                },
+                            )
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .into(),
                 ],
                 vec![
                     "".into(),
-                    Span::styled("Title", Style::default().add_modifier(Modifier::BOLD)).into(),
+                    Span::styled(
+                        "[2] Title",
+                        Style::default()
+                            .fg(
+                                if self.search_by == SearchBy::Title
+                                    && (self.mode == Mode::Search || self.mode == Mode::Select)
+                                {
+                                    Color::Yellow
+                                } else {
+                                    Color::White
+                                },
+                            )
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .into(),
+                ],
+                vec![
+                    "".into(),
+                    Span::styled(
+                        "[3] Artist",
+                        Style::default()
+                            .fg(
+                                if self.search_by == SearchBy::Artist
+                                    && (self.mode == Mode::Search || self.mode == Mode::Select)
+                                {
+                                    Color::Yellow
+                                } else {
+                                    Color::White
+                                },
+                            )
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .into(),
+                ],
+                vec![
+                    "".into(),
+                    Span::styled(
+                        "[4] Album",
+                        Style::default()
+                            .fg(
+                                if self.search_by == SearchBy::Album
+                                    && (self.mode == Mode::Search || self.mode == Mode::Select)
+                                {
+                                    Color::Yellow
+                                } else {
+                                    Color::White
+                                },
+                            )
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .into(),
+                ],
+                vec![
+                    "".into(),
+                    Span::styled(
+                        "[5] Genre",
+                        Style::default()
+                            .fg(
+                                if self.search_by == SearchBy::Genre
+                                    && (self.mode == Mode::Search || self.mode == Mode::Select)
+                                {
+                                    Color::Yellow
+                                } else {
+                                    Color::White
+                                },
+                            )
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .into(),
                 ],
                 vec![
                     "".into(),
                     Span::styled("Length", Style::default().add_modifier(Modifier::BOLD)).into(),
-                ],
-                vec![
-                    "".into(),
-                    Span::styled("Artist", Style::default().add_modifier(Modifier::BOLD)).into(),
-                ],
-                vec![
-                    "".into(),
-                    Span::styled("Album", Style::default().add_modifier(Modifier::BOLD)).into(),
-                ],
-                vec![
-                    "".into(),
-                    Span::styled("Genre", Style::default().add_modifier(Modifier::BOLD)).into(),
                 ],
             ];
             let mut to_iter: Vec<Song> = if self.mode == Mode::Sitback {
@@ -136,12 +203,12 @@ impl Widget for &App {
                         Span::styled(
                             {
                                 match n {
-                                    0 => (i + 1 as usize).to_string(),
+                                    0 => song.file_path.clone(),
                                     1 => song.title.clone(),
-                                    2 => generate_label(song.duration.as_secs()),
-                                    3 => song.artist.clone(),
-                                    4 => song.album.clone(),
-                                    5 => song.genre.clone(),
+                                    2 => song.artist.clone(),
+                                    3 => song.album.clone(),
+                                    4 => song.genre.clone(),
+                                    5 => generate_label(song.duration.as_secs()),
                                     _ => "Undefined".to_string(),
                                 }
                             },
@@ -156,7 +223,7 @@ impl Widget for &App {
                                         Modifier::BOLD
                                     } else if self.mode == Mode::Sitback {
                                         if i == 0 {
-                                            Modifier::SLOW_BLINK
+                                            Modifier::UNDERLINED
                                         } else {
                                             Modifier::DIM
                                         }
