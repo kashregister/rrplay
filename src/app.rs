@@ -68,19 +68,23 @@ pub enum SearchBy {
 
 impl Default for App {
     fn default() -> Self {
-        // let tuple: (OutputStream, OutputStreamHandle) = OutputStream::try_default().unwrap();
+        // Constructs a new instance of [`App`].
+        let (stream, stream_handle) = OutputStream::try_default().unwrap();
+        let sources = App::check_config_validity();
+        let search_cache = App::search_directories(sources.clone());
+
         Self {
             running: true,
             search_results: Vec::new(),
-            search_cache: Vec::new(),
+            search_cache,
             queue: Vec::new(),
             query: String::new(),
-            events: EventHandler::new(),
+            events: EventHandler::default(),
             mode: Mode::Sitback,
             select_index: 0,
-            sources: App::check_config_validity(),
-            sink: Sink::try_new(&OutputStream::try_default().unwrap().1).unwrap(),
-            stream: OutputStream::try_default().unwrap().0,
+            sources,
+            sink: Sink::try_new(&stream_handle).unwrap(),
+            stream: stream,
             terminal_size: (0, 0),
             help_display: true,
             search_by: SearchBy::FilePath,
@@ -89,18 +93,6 @@ impl Default for App {
 }
 
 impl App {
-    /// Constructs a new instance of [`App`].
-    pub fn new() -> Self {
-        let mut out = Self::default();
-        let (stream, stream_handle) = OutputStream::try_default().unwrap();
-        out.sink = Sink::try_new(&stream_handle).unwrap();
-        out.stream = stream;
-        if out.sources.clone().is_some() {
-            out.search_cache = App::search_directories(out.sources.clone());
-        }
-        out
-    }
-
     pub fn config_check_file_exists() -> bool {
         if let Some(cfg_dir) = dirs::config_dir() {
             let exists = cfg_dir.join("rrplay").join("config");
@@ -263,16 +255,18 @@ impl App {
                         }
                     }
                     AppEvent::MoveUp => {
-                        if self.select_index < self.search_results.len() - 1 {
+                        if (self.select_index as i32) < (self.search_results.len() as i32 - 1)
+                            && !self.search_results.is_empty()
+                        {
                             self.select_index += 1;
                         }
                     }
-                    AppEvent::HelpDesk => self.help_display = !self.help_display,
                     AppEvent::MoveDown => {
-                        if self.select_index > 0 {
+                        if self.select_index > 0 && !self.search_results.is_empty() {
                             self.select_index -= 1;
                         }
                     }
+                    AppEvent::HelpDesk => self.help_display = !self.help_display,
                     AppEvent::AddSingle => {
                         if !self.search_results.is_empty() {
                             let index = self.search_results.len() - 1 - self.select_index;
