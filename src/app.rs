@@ -167,11 +167,13 @@ impl App {
                                                 .as_deref()
                                                 .unwrap_or_else(|| "N/A")
                                                 .to_string(),
-                                            album: primary_tag
-                                                .album()
-                                                .as_deref()
-                                                .unwrap_or_else(|| "N/A")
-                                                .to_string(),
+                                            album: {
+                                                primary_tag
+                                                    .album()
+                                                    .as_deref()
+                                                    .unwrap_or_else(|| "N/A")
+                                                    .to_string()
+                                            },
                                             artist: primary_tag
                                                 .artist()
                                                 .as_deref()

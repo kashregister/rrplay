@@ -69,27 +69,25 @@ impl Widget for &App {
             ])
             .split(layout[1]);
 
-        let title_block = if self.mode == Mode::Select {
-            Block::bordered()
-                .title("Search results")
-                .title_alignment(Alignment::Center)
-                .border_type(BorderType::Plain)
-                .border_style(Style::new().yellow())
-        } else if self.mode == Mode::Search {
-            Block::bordered()
-                .title("Search results")
-                .title_alignment(Alignment::Center)
-                .border_type(BorderType::Plain)
-        } else if self.mode == Mode::Sitback {
-            Block::bordered()
-                .title("Queue")
-                .title_alignment(Alignment::Center)
-                .border_type(BorderType::Plain)
-        } else {
-            Block::bordered()
-                .title("Undefined")
-                .title_alignment(Alignment::Center)
-        };
+        let title_block = Block::bordered()
+            .title({
+                if self.mode == Mode::Select || self.mode == Mode::Search {
+                    "Search results"
+                } else if self.mode == Mode::Sitback {
+                    "Queue"
+                } else {
+                    "Undefined"
+                }
+            })
+            .title_alignment(Alignment::Center)
+            .border_type(BorderType::Plain)
+            .border_style({
+                if self.mode == Mode::Select {
+                    Style::new().yellow()
+                } else {
+                    Style::new()
+                }
+            });
         let borderless_block = Block::new().borders(Borders::NONE);
 
         let array_test: Vec<Vec<Line<'_>>> = {
@@ -191,27 +189,24 @@ impl Widget for &App {
             .block(title_block)
             .centered()
             .render(layout[0], buf);
-        let mode_block = if self.mode == Mode::Search {
-            Block::bordered()
-                .title("Query")
-                .title_alignment(Alignment::Center)
-                .border_type(BorderType::Plain)
-                .border_style(Style::new().yellow())
-        } else if self.mode == Mode::Sitback {
-            Block::bordered()
-                .title_alignment(Alignment::Center)
-                .border_type(BorderType::Plain)
-        } else if self.mode == Mode::Select {
-            Block::bordered()
-                .title("Query")
-                .title_alignment(Alignment::Center)
-                .border_type(BorderType::Plain)
-        } else {
-            Block::bordered()
-                .title("Undefined")
-                .title_alignment(Alignment::Center)
-                .border_type(BorderType::Plain)
-        };
+
+        let mode_block = Block::bordered()
+            .title(if self.mode == Mode::Search {
+                "Query"
+            } else if self.mode == Mode::Sitback {
+                ""
+            } else if self.mode == Mode::Select {
+                "Query"
+            } else {
+                "Undefined"
+            })
+            .title_alignment(Alignment::Center)
+            .border_type(BorderType::Plain)
+            .border_style(if self.mode == Mode::Search {
+                Style::new().yellow()
+            } else {
+                Style::new()
+            });
 
         let status_volume_block = Block::bordered()
             .title("Volume")
@@ -222,28 +217,20 @@ impl Widget for &App {
             .title("Status")
             .title_alignment(Alignment::Center)
             .border_type(BorderType::Plain);
-        // .border_style(Style::new().red());
 
         if self.mode == Mode::Sitback {
-            if self.queue.len() > 0 && self.sink.is_paused() == false {
+            if self.queue.len() > 0 {
                 let label = Span::styled(
                     generate_label(self.sink.get_pos().as_secs()),
                     Style::new().italic().bold().fg(Color::DarkGray),
                 );
                 Gauge::default()
                     .block(mode_block)
-                    .gauge_style(Style::new().green())
-                    .ratio(self.sink.get_pos().as_secs_f64() / self.queue[0].duration.as_secs_f64())
-                    .label(label)
-                    .render(bottom_layout[1], buf);
-            } else if self.queue.len() > 0 && self.sink.is_paused() {
-                let label = Span::styled(
-                    generate_label(self.sink.get_pos().as_secs()),
-                    Style::new().italic().bold().fg(Color::DarkGray),
-                );
-                Gauge::default()
-                    .block(mode_block)
-                    .gauge_style(Style::new().red())
+                    .gauge_style(if self.sink.is_paused() {
+                        Style::new().red()
+                    } else {
+                        Style::new().green()
+                    })
                     .ratio(self.sink.get_pos().as_secs_f64() / self.queue[0].duration.as_secs_f64())
                     .label(label)
                     .render(bottom_layout[1], buf);
@@ -255,14 +242,7 @@ impl Widget for &App {
                     .centered()
                     .render(bottom_layout[1], buf);
             }
-        } else if self.mode == Mode::Search {
-            Paragraph::new(self.query.clone())
-                .block(mode_block)
-                .fg(Color::White)
-                .bg(Color::Black)
-                .centered()
-                .render(bottom_layout[1], buf);
-        } else if self.mode == Mode::Select {
+        } else if self.mode == Mode::Search || self.mode == Mode::Select {
             Paragraph::new(self.query.clone())
                 .block(mode_block)
                 .fg(Color::White)
@@ -277,21 +257,22 @@ impl Widget for &App {
             .centered();
         volume_paragraph.render(bottom_layout[2], buf);
 
-        if self.sink.is_paused() {
-            Paragraph::new("Paused")
-                .block(status_playing_block)
-                .fg(Color::White)
-                .bg(Color::Black)
-                .centered()
-                .render(bottom_layout[0], buf);
-        } else {
-            Paragraph::new("Playing")
-                .block(status_playing_block)
-                .fg(Color::White)
-                .bg(Color::Black)
-                .centered()
-                .render(bottom_layout[0], buf);
-        };
+        Paragraph::new({
+            if self.queue.len() == 0 {
+                "N/A"
+            } else {
+                if self.sink.is_paused() {
+                    "Paused"
+                } else {
+                    "Playing"
+                }
+            }
+        })
+        .block(status_playing_block)
+        .fg(Color::White)
+        .bg(Color::Black)
+        .centered()
+        .render(bottom_layout[0], buf);
 
         if self.help_display {
             let help_block = Block::new()
@@ -339,7 +320,5 @@ impl Widget for &App {
                 .render(popup_area, buf);
             }
         }
-
-        // status_paragraph.render(bottom_layout[0], buf);
     }
 }
