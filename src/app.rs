@@ -1,4 +1,5 @@
 use crate::event::{AppEvent, Event, EventHandler};
+use crossterm::event::KeyEventKind;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use lofty::file::AudioFile;
 use lofty::prelude::*;
@@ -407,7 +408,7 @@ impl App {
 
     /// Handles the key events and updates the state of [`App`].
     pub fn handle_key_events(&mut self, key_event: KeyEvent) -> color_eyre::Result<()> {
-        if !self.help_display {
+        if !self.help_display && key_event.kind == KeyEventKind::Press {
             match key_event.code {
                 KeyCode::Esc => self.events.send(AppEvent::Escape),
                 KeyCode::Enter => {
@@ -527,10 +528,12 @@ impl App {
                 }
             }
         } else {
-            match key_event.code {
-                KeyCode::Esc => self.events.send(AppEvent::HelpDesk),
-                KeyCode::Char('q') => self.events.send(AppEvent::HelpDesk),
-                _ => {}
+            if key_event.kind == KeyEventKind::Press {
+                match key_event.code {
+                    KeyCode::Esc => self.events.send(AppEvent::HelpDesk),
+                    KeyCode::Char('q') => self.events.send(AppEvent::HelpDesk),
+                    _ => {}
+                }
             }
         }
         Ok(())
