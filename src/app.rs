@@ -521,7 +521,6 @@ impl App {
         } else if key_event.kind == KeyEventKind::Press {
             match key_event.code {
                 KeyCode::Esc => self.events.send(AppEvent::HelpDesk),
-                KeyCode::Char('q') => self.events.send(AppEvent::HelpDesk),
                 _ => {}
             }
         }
