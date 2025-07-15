@@ -354,6 +354,7 @@ impl Widget for &App {
                 width: area.width / 2,
                 height: area.height / 3,
             };
+
             Clear.render(popup_area, buf);
 
             if let Some(sources_ok) = self.sources.clone() {
@@ -387,6 +388,14 @@ impl Widget for &App {
                 .block(help_block)
                 .render(popup_area, buf);
             }
+
+            let mut hint_popup_area = popup_area;
+            hint_popup_area.y += popup_area.height - 1;
+            hint_popup_area.x += 1;
+
+            Paragraph::new("Press <Esc> to close this dialog".to_string())
+                .alignment(Alignment::Left)
+                .render(hint_popup_area, buf);
         }
     }
 }
