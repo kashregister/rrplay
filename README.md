@@ -40,12 +40,8 @@ l - move forward 5s
 
 **Select mode:**\
 Enter - Add single to the queue\
-a - Add album to the queue
-
-### Searching
-
-Fuzzy search allows you to quikcly find what you are looking for whether its an
-album, a track, an artist or a mix of everything since it uses the full paths.
+a - Add album to the queue\
+1-6 - Search through different metadata
 
 # Installing
 
