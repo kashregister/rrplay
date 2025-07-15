@@ -8,8 +8,8 @@ use ratatui::{
 };
 
 fn format_seconds(seconds: u64) -> (u64, u64) {
-    let mut secs = seconds.clone();
-    let min = secs / 60 as u64;
+    let mut secs = seconds;
+    let min = secs / 60_u64;
     secs -= min * 60;
     (min, secs)
 }
@@ -24,13 +24,11 @@ fn generate_label(seconds: u64) -> String {
 }
 
 impl Widget for &App {
-    /// Renders the user interface widgets.
-    ///
+    // Renders the user interface widgets.
     // This is where you add new widgets.
     // See the following resources:
     // - https://docs.rs/ratatui/latest/ratatui/widgets/index.html
     // - https://github.com/ratatui/ratatui/tree/master/examples
-    //
 
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Color for the focused window
@@ -291,7 +289,7 @@ impl Widget for &App {
             .border_type(BorderType::Plain);
 
         if self.mode == Mode::Sitback {
-            if self.queue.len() > 0 {
+            if !self.queue.is_empty() {
                 let label = Span::styled(
                     generate_label(self.sink.get_pos().as_secs()),
                     Style::new().italic().bold().fg(Color::DarkGray),
@@ -330,14 +328,12 @@ impl Widget for &App {
         volume_paragraph.render(bottom_layout[2], buf);
 
         Paragraph::new({
-            if self.queue.len() == 0 {
+            if self.queue.is_empty() {
                 "N/A"
+            } else if self.sink.is_paused() {
+                "Paused"
             } else {
-                if self.sink.is_paused() {
-                    "Paused"
-                } else {
-                    "Playing"
-                }
+                "Playing"
             }
         })
         .block(status_playing_block)
@@ -373,7 +369,7 @@ impl Widget for &App {
                     .collect();
                 let mut start = Vec::from([Span::styled("Sources:", Style::default()).into()]);
                 start.append(&mut sources);
-                _ = Paragraph::new(start)
+                Paragraph::new(start)
                     .style(Style::new())
                     .block(help_block.clone())
                     .render(popup_area, buf);

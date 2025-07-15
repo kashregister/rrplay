@@ -95,9 +95,8 @@ impl App {
         let (stream, stream_handle) = OutputStream::try_default().unwrap();
         out.sink = Sink::try_new(&stream_handle).unwrap();
         out.stream = stream;
-        if let Some(_) = out.sources.clone() {
+        if out.sources.clone().is_some() {
             out.search_cache = App::search_directories(out.sources.clone());
-        } else {
         }
         out
     }
@@ -125,7 +124,7 @@ impl App {
                 let config_file = cfg_dir.join("rrplay").join("config");
                 let file_contents: String =
                     std::fs::read_to_string(config_file).unwrap_or_else(|_| "~~~~".to_string());
-                if file_contents == "~~~~" || file_contents == "" {
+                if file_contents == "~~~~" || file_contents.is_empty() {
                     return None;
                 }
                 let paths = file_contents.split("\n");
@@ -158,7 +157,7 @@ impl App {
 
                 for entry in WalkDir::new(source.0).into_iter().filter_map(|e| e.ok()) {
                     if let Some(ext) = entry.path().extension() {
-                        if file_types.contains(&ext.to_str().unwrap_or_else(|| "No ext")) {
+                        if file_types.contains(&ext.to_str().unwrap_or("No ext")) {
                             if let Some(filename) =
                                 Path::new(entry.clone().path().as_os_str()).file_name()
                             {
@@ -167,7 +166,7 @@ impl App {
                                     .read()
                                     .expect("ERROR: Failed to read file!");
                                 let duration: Duration = tagged_file.properties().duration();
-                                let _tag = match tagged_file.primary_tag() {
+                                match tagged_file.primary_tag() {
                                     Some(primary_tag) => {
                                         let new_entry: Song = Song {
                                             file_path: entry.path().display().to_string(),
@@ -177,25 +176,25 @@ impl App {
                                             title: primary_tag
                                                 .title()
                                                 .as_deref()
-                                                .unwrap_or_else(|| "N/A")
+                                                .unwrap_or("N/A")
                                                 .to_string(),
                                             album: {
                                                 primary_tag
                                                     .album()
                                                     .as_deref()
-                                                    .unwrap_or_else(|| "N/A")
+                                                    .unwrap_or("N/A")
                                                     .to_string()
                                             },
                                             artist: primary_tag
                                                 .artist()
                                                 .as_deref()
-                                                .unwrap_or_else(|| "N/A")
+                                                .unwrap_or("N/A")
                                                 .to_string(),
-                                            duration: duration,
+                                            duration,
                                             genre: primary_tag
                                                 .genre()
                                                 .as_deref()
-                                                .unwrap_or_else(|| "N/A")
+                                                .unwrap_or("N/A")
                                                 .to_string(),
                                         };
                                         out.push(new_entry);
@@ -213,7 +212,7 @@ impl App {
                                             title: filename.to_str().unwrap().to_string(),
                                             artist: "N/A".to_string(),
                                             album: "N/A".to_string(),
-                                            duration: duration,
+                                            duration,
                                             genre: "N/A".to_string(),
                                         };
                                         out.push(new_entry);
@@ -237,10 +236,11 @@ impl App {
             self.terminal_size = (size.width, size.height);
             match self.events.next().await? {
                 Event::Tick => self.tick(),
-                Event::Crossterm(event) => match event {
-                    crossterm::event::Event::Key(key_event) => self.handle_key_events(key_event)?,
-                    _ => {}
-                },
+                Event::Crossterm(event) => {
+                    if let crossterm::event::Event::Key(key_event) = event {
+                        self.handle_key_events(key_event)?
+                    }
+                }
                 Event::App(app_event) => match app_event {
                     AppEvent::Quit => self.quit(),
                     AppEvent::Search => {
@@ -250,7 +250,7 @@ impl App {
                         // )?);
                     }
                     AppEvent::Select => {
-                        if self.search_results.len() > 0 && self.mode == Mode::Search {
+                        if !self.search_results.is_empty() && self.mode == Mode::Search {
                             self.mode = Mode::Select;
                             self.select_index = self.search_results.len() - 1;
                         }
@@ -274,7 +274,7 @@ impl App {
                         }
                     }
                     AppEvent::AddSingle => {
-                        if self.search_results.len() != 0 {
+                        if !self.search_results.is_empty() {
                             let index = self.search_results.len() - 1 - self.select_index;
 
                             let song = &self.search_results[index];
@@ -294,7 +294,7 @@ impl App {
                         }
                     }
                     AppEvent::AddAlbum => {
-                        if self.search_results.len() != 0 {
+                        if !self.search_results.is_empty() {
                             let index = self.search_results.len() - 1 - self.select_index;
                             let song = self.search_results[index].clone();
                             let album_name = song.album;
@@ -351,16 +351,14 @@ impl App {
 
                     AppEvent::MoveForward => {
                         let pos = self.sink.get_pos();
-                        if self.queue.len() > 0 {
-                            if pos + SEEK_CHANGE < self.queue[0].duration {
-                                let _ = self.sink.try_seek(pos + SEEK_CHANGE);
-                            }
+                        if !self.queue.is_empty() && pos + SEEK_CHANGE < self.queue[0].duration {
+                            let _ = self.sink.try_seek(pos + SEEK_CHANGE);
                         }
                     }
                     AppEvent::MoveBackward => {
                         let pos = self.sink.get_pos();
 
-                        if self.queue.len() > 0 {
+                        if !self.queue.is_empty() {
                             if pos.as_secs() as i32 - SEEK_CHANGE.as_secs() as i32 > 0 {
                                 let _ = self.sink.try_seek(pos - SEEK_CHANGE);
                             } else {
@@ -369,7 +367,7 @@ impl App {
                         }
                     }
                     AppEvent::RefreshResults => {
-                        if self.query.len() > 0 {
+                        if !self.query.is_empty() {
                             let matcher = SkimMatcherV2::default();
                             let mut entries_with_score: Vec<(Song, i64)> = Vec::new();
                             for entry in self.search_cache.clone() {
@@ -396,8 +394,7 @@ impl App {
                             for entry in entries_with_score {
                                 self.search_results.push(entry.0)
                             }
-                            self.select_index =
-                                (self.search_results.len() as i32 - 1 as i32) as usize;
+                            self.select_index = (self.search_results.len() as i32 - 1_i32) as usize;
                         }
                     }
                 },
@@ -433,7 +430,7 @@ impl App {
                     KeyCode::Char('q') => self.events.send(AppEvent::Quit),
                     KeyCode::Char('p') => {
                         if self.mode == Mode::Sitback {
-                            if self.sink.is_paused() == true {
+                            if self.sink.is_paused() {
                                 self.events.send(AppEvent::Resume);
                             } else {
                                 self.events.send(AppEvent::Pause);
@@ -504,7 +501,7 @@ impl App {
                 match key_event.code {
                     KeyCode::Enter => {}
                     KeyCode::Char(' ') => {
-                        self.query.push_str(" ");
+                        self.query.push(' ');
                         self.events.send(AppEvent::RefreshResults);
                     }
                     KeyCode::Backspace => {
@@ -513,7 +510,7 @@ impl App {
                             self.search_results.clear();
                         } else {
                             self.query.pop();
-                            if self.query != "" {
+                            if !self.query.is_empty() {
                                 self.events.send(AppEvent::RefreshResults);
                             } else {
                                 self.search_results.clear();
@@ -527,13 +524,11 @@ impl App {
                     }
                 }
             }
-        } else {
-            if key_event.kind == KeyEventKind::Press {
-                match key_event.code {
-                    KeyCode::Esc => self.events.send(AppEvent::HelpDesk),
-                    KeyCode::Char('q') => self.events.send(AppEvent::HelpDesk),
-                    _ => {}
-                }
+        } else if key_event.kind == KeyEventKind::Press {
+            match key_event.code {
+                KeyCode::Esc => self.events.send(AppEvent::HelpDesk),
+                KeyCode::Char('q') => self.events.send(AppEvent::HelpDesk),
+                _ => {}
             }
         }
         Ok(())
