@@ -7,6 +7,16 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph, Widget, Wrap},
 };
 
+fn clamp(min: f64, max: f64, input: f64) -> f64 {
+    if input > max {
+        max
+    } else if input < min {
+        min
+    } else {
+        input
+    }
+}
+
 fn format_seconds(seconds: u64) -> (u64, u64) {
     let mut secs = seconds;
     let min = secs / 60_u64;
@@ -301,7 +311,11 @@ impl Widget for &App {
                     } else {
                         Style::new().green()
                     })
-                    .ratio(self.sink.get_pos().as_secs_f64() / self.queue[0].duration.as_secs_f64())
+                    .ratio({
+                        let ratio = self.sink.get_pos().as_secs_f64()
+                            / self.queue[0].duration.as_secs_f64();
+                        clamp(0.0, 1.0, ratio)
+                    })
                     .label(label)
                     .render(bottom_layout[1], buf);
             } else {
