@@ -1,4 +1,6 @@
 use crate::event::{AppEvent, Event, EventHandler};
+use crate::widgets::PopupManual;
+use crate::widgets::PopupNotif;
 use crossterm::event::KeyEventKind;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use lofty::file::AudioFile;
@@ -7,6 +9,7 @@ use lofty::probe::Probe;
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
+    style::Color,
 };
 use rodio::{OutputStream, Sink};
 use std::io::BufReader;
@@ -45,8 +48,9 @@ pub struct App {
     pub sink: Sink,
     pub stream: OutputStream,
     pub terminal_size: (u16, u16),
-    pub help_display: bool,
     pub search_by: SearchBy,
+    pub popup_manual: Option<PopupManual>,
+    pub popup_notif: Vec<PopupNotif>,
     // pub stream_handle: OutputStreamHandle,
 }
 
@@ -71,12 +75,11 @@ impl Default for App {
         // Constructs a new instance of [`App`].
         let (stream, stream_handle) = OutputStream::try_default().unwrap();
         let sources = App::check_config_validity();
-        let search_cache = App::search_directories(sources.clone());
 
-        Self {
+        let mut init = Self {
             running: true,
             search_results: Vec::new(),
-            search_cache,
+            search_cache: Vec::new(),
             queue: Vec::new(),
             query: String::new(),
             events: EventHandler::default(),
@@ -86,20 +89,25 @@ impl Default for App {
             sink: Sink::try_new(&stream_handle).unwrap(),
             stream: stream,
             terminal_size: (0, 0),
-            help_display: true,
             search_by: SearchBy::FilePath,
-        }
+            popup_manual: None,
+            popup_notif: Vec::new(),
+        };
+        init.events.send(AppEvent::InitPopup);
+        init.events.send(AppEvent::RefreshCache);
+        init.events.send(AppEvent::HelpDesk);
+        return init;
     }
 }
 
 impl App {
     pub fn config_check_file_exists() -> bool {
         if let Some(cfg_dir) = dirs::config_dir() {
-            let exists = cfg_dir.join("rrplay").join("config");
+            let exists = cfg_dir.join("rrplay").join("config.txt");
             if !exists.is_file() {
                 let mut config_file = cfg_dir.join("rrplay");
                 std::fs::create_dir_all(config_file.clone()).unwrap();
-                config_file = cfg_dir.join("rrplay/config");
+                config_file = cfg_dir.join("rrplay/config.txt");
                 std::fs::write(config_file, "").unwrap();
                 true
             } else {
@@ -111,9 +119,10 @@ impl App {
     }
 
     pub fn check_config_validity() -> Option<Vec<(String, bool)>> {
+        // TODO: find a better way of doing this
         if App::config_check_file_exists() {
             if let Some(cfg_dir) = dirs::config_dir() {
-                let config_file = cfg_dir.join("rrplay").join("config");
+                let config_file = cfg_dir.join("rrplay").join("config.txt");
                 let file_contents: String =
                     std::fs::read_to_string(config_file).unwrap_or_else(|_| "~~~~".to_string());
                 if file_contents == "~~~~" || file_contents.is_empty() {
@@ -248,10 +257,14 @@ impl App {
                         }
                     }
                     AppEvent::Escape => {
-                        if self.mode == Mode::Select {
-                            self.mode = Mode::Search;
+                        if self.popup_manual.is_some() {
+                            self.popup_manual = None;
                         } else {
-                            self.mode = Mode::Sitback;
+                            if self.mode == Mode::Select {
+                                self.mode = Mode::Search;
+                            } else {
+                                self.mode = Mode::Sitback;
+                            }
                         }
                     }
                     AppEvent::MoveUp => {
@@ -266,7 +279,52 @@ impl App {
                             self.select_index -= 1;
                         }
                     }
-                    AppEvent::HelpDesk => self.help_display = !self.help_display,
+                    AppEvent::HelpDesk => {
+                        self.popup_manual = Some(PopupManual {
+                            title: "Help desk".to_string(),
+                            border_color: {
+                                if self.sources.is_some() {
+                                    Color::White
+                                } else {
+                                    Color::Red
+                                }
+                            },
+                            bottom_hint: PopupManual::default().bottom_hint,
+                            message: {
+                                if let Some(sources_ok) = self.sources.clone() {
+                                    let mut out: Vec<(String, Color)> = Vec::new();
+                                    out.push(("Sources:".to_string(), Color::White));
+                                    for s in sources_ok {
+                                        if s.1 {
+                                            out.push((s.0, Color::Green));
+                                        } else {
+                                            out.push((s.0, Color::Red));
+                                        }
+                                    }
+                                    out
+                                } else {
+                                    let mut ret = vec![
+                                        "No sources found...".to_string(),
+                                        "Add some!".to_string(),
+                                        "File location:".to_string(),
+                                    ];
+                                    if let Some(cfg_dir) = dirs::config_dir() {
+                                        ret.push(
+                                            cfg_dir
+                                                .join("rrplay")
+                                                .join("config.txt")
+                                                .display()
+                                                .to_string(),
+                                        );
+                                    }
+                                    ret.clone()
+                                        .iter()
+                                        .map(|t| (t.to_string(), Color::White))
+                                        .collect()
+                                }
+                            },
+                        });
+                    }
                     AppEvent::AddSingle => {
                         if !self.search_results.is_empty() {
                             let index = self.search_results.len() - 1 - self.select_index;
@@ -312,6 +370,16 @@ impl App {
                                 }
                             }
                         }
+
+                        self.popup_notif.push({
+                            PopupNotif {
+                                message: vec![("Added album to queue".to_string(), Color::White)],
+                                border_color: Color::Green,
+                                duration_ticks: Some(30),
+                                title: "".to_string(),
+                                index: 1,
+                            }
+                        });
                     }
                     AppEvent::Resume => {
                         self.sink.play();
@@ -391,6 +459,21 @@ impl App {
                             self.select_index = (self.search_results.len() as i32 - 1_i32) as usize;
                         }
                     }
+                    AppEvent::RefreshCache => {
+                        let src = self.sources.clone();
+                        self.search_cache = App::search_directories(src);
+                    }
+                    AppEvent::InitPopup => {
+                        self.popup_manual = Some(PopupManual {
+                            title: "".to_string(),
+                            border_color: Color::Blue,
+                            bottom_hint: PopupManual::default().bottom_hint,
+                            message: vec![(
+                                "Scanning your directories...".to_string(),
+                                Color::White,
+                            )],
+                        });
+                    }
                 },
             }
         }
@@ -399,7 +482,12 @@ impl App {
 
     /// Handles the key events and updates the state of [`App`].
     pub fn handle_key_events(&mut self, key_event: KeyEvent) -> color_eyre::Result<()> {
-        if !self.help_display && key_event.kind == KeyEventKind::Press {
+        if self.popup_manual.is_some() && key_event.kind == KeyEventKind::Press {
+            match key_event.code {
+                KeyCode::Esc => self.events.send(AppEvent::Escape),
+                _ => {}
+            }
+        } else if self.popup_manual.is_none() && key_event.kind == KeyEventKind::Press {
             match key_event.code {
                 KeyCode::Esc => self.events.send(AppEvent::Escape),
                 KeyCode::Enter => {
@@ -483,6 +571,16 @@ impl App {
                             self.events.send(AppEvent::Quit)
                         } else {
                             self.events.send(AppEvent::ClearQueue);
+
+                            self.popup_notif.push({
+                                PopupNotif {
+                                    message: vec![("Cleared the queue".to_string(), Color::White)],
+                                    border_color: Color::Yellow,
+                                    duration_ticks: Some(30),
+                                    title: "".to_string(),
+                                    index: self.popup_notif.len() + 1,
+                                }
+                            });
                         }
                     }
 
@@ -518,11 +616,6 @@ impl App {
                     }
                 }
             }
-        } else if key_event.kind == KeyEventKind::Press {
-            match key_event.code {
-                KeyCode::Esc => self.events.send(AppEvent::HelpDesk),
-                _ => {}
-            }
         }
         Ok(())
     }
@@ -534,6 +627,25 @@ impl App {
     pub fn tick(&mut self) {
         if self.sink.len() < self.queue.len() {
             self.queue.remove(0);
+        }
+        if !self.popup_notif.is_empty() {}
+        let mut n_idx = Vec::new();
+        for (i, notif) in self.popup_notif.iter_mut().enumerate() {
+            if let Some(t) = notif.duration_ticks {
+                if t == 1 {
+                    notif.duration_ticks = None;
+                } else {
+                    notif.duration_ticks = Some(t - 1);
+                }
+            } else {
+                n_idx.push(i);
+            }
+        }
+        for i in n_idx {
+            self.popup_notif.remove(i);
+        }
+        for (i, notif) in self.popup_notif.iter_mut().enumerate() {
+            notif.index = i + 1;
         }
     }
 

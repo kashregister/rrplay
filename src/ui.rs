@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Alignment, Rect},
     prelude::*,
     style::{Color, Stylize},
-    widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph, Widget, Wrap},
+    widgets::{Block, BorderType, Borders, Gauge, Paragraph, Widget},
 };
 
 fn clamp(min: f64, max: f64, input: f64) -> f64 {
@@ -355,66 +355,11 @@ impl Widget for &App {
         .bg(Color::Black)
         .centered()
         .render(bottom_layout[0], buf);
-
-        if self.help_display {
-            let help_block = Block::new()
-                .title("Help desk")
-                .title_style(Style::new().white().bold())
-                .borders(Borders::ALL)
-                .border_style(Style::new());
-
-            let popup_area = Rect {
-                x: area.width / 4,
-                y: area.height / 3,
-                width: area.width / 2,
-                height: area.height / 3,
-            };
-
-            if popup_area.height < 1 {
-                return;
-            }
-
-            Clear.render(popup_area, buf);
-
-            if let Some(sources_ok) = self.sources.clone() {
-                let mut sources: Vec<Line<'_>> = sources_ok
-                    .into_iter()
-                    .map(|s| {
-                        Span::styled(
-                            s.0,
-                            Style::default().fg(if s.1 { Color::Green } else { Color::Red }),
-                        )
-                        .into()
-                    })
-                    .collect();
-                let mut start = Vec::from([Span::styled("Sources:", Style::default()).into()]);
-                start.append(&mut sources);
-                Paragraph::new(start)
-                    .style(Style::new())
-                    .block(help_block.clone())
-                    .render(popup_area, buf);
-            } else {
-                Paragraph::new({
-                    let mut ret = "No sources found...\nAdd some!\nFile location:\n".to_string();
-                    if let Some(cfg_dir) = dirs::config_dir() {
-                        let str = cfg_dir.join("rrplay").join("config").display().to_string();
-                        ret.push_str(&str);
-                    }
-                    ret
-                })
-                .wrap(Wrap { trim: true })
-                .style(Style::new())
-                .block(help_block)
-                .render(popup_area, buf);
-            }
-
-            let mut hint_popup_area = popup_area;
-            hint_popup_area.y += popup_area.height - 1;
-            hint_popup_area.x += 1;
-
-            Paragraph::new("Press <Esc> to close window".to_string())
-                .alignment(Alignment::Left)
-                .render(hint_popup_area, buf);
+        for notif in self.popup_notif.clone() {
+            notif.render(area, buf);
+        }
+        if let Some(mp) = self.popup_manual.clone() {
+            mp.render(area, buf);
         }
     }
 }
