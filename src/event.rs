@@ -31,6 +31,7 @@ pub enum Event {
 /// You can extend this enum with your own custom events.
 #[derive(Clone, Debug)]
 pub enum AppEvent {
+    InitPopup,
     Quit,
     ClearQueue,
     RefreshResults,
@@ -49,6 +50,7 @@ pub enum AppEvent {
     MoveForward,
     MoveBackward,
     HelpDesk,
+    RefreshCache,
 }
 
 /// Terminal event handler.
