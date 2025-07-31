@@ -385,7 +385,10 @@ impl App {
 
                         self.popup_notif.push({
                             PopupNotif {
-                                message: vec![("Added album to queue".to_string(), Color::White)],
+                                message: vec![(
+                                    "Added album to the queue".to_string(),
+                                    Color::White,
+                                )],
                                 border_color: Color::Green,
                                 duration_ticks: Some(NOTIF_DURATION),
                                 title: "".to_string(),
