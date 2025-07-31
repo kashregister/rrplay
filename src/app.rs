@@ -17,7 +17,8 @@ use std::path::Path;
 use std::time::Duration;
 use walkdir::WalkDir;
 
-const VOLUME_CHANGE: f32 = 0.1;
+const VOLUME_CHANGE: f32 = 0.05;
+const NOTIF_DURATION: usize = 60;
 const SEEK_CHANGE: Duration = Duration::from_secs(5);
 /// Application.
 #[derive(Clone)]
@@ -119,27 +120,38 @@ impl App {
     }
 
     pub fn check_config_validity() -> Option<Vec<(String, bool)>> {
-        // TODO: find a better way of doing this
         if App::config_check_file_exists() {
             if let Some(cfg_dir) = dirs::config_dir() {
                 let config_file = cfg_dir.join("rrplay").join("config.txt");
-                let file_contents: String =
-                    std::fs::read_to_string(config_file).unwrap_or_else(|_| "~~~~".to_string());
-                if file_contents == "~~~~" || file_contents.is_empty() {
-                    return None;
-                }
-                let paths = file_contents.split("\n");
-                let mut output: Vec<(String, bool)> = Vec::new();
-                for path in paths {
-                    let ap = path.trim().to_string();
+                let file_contents: Option<String> = match std::fs::read_to_string(config_file) {
+                    Ok(content) => {
+                        if content.is_empty() {
+                            None
+                        } else {
+                            Some(content)
+                        }
+                    }
+                    Err(_) => None,
+                };
+                match file_contents {
+                    Some(c) => {
+                        let paths = c.split("\n");
+                        let mut output: Vec<(String, bool)> = Vec::new();
+                        for path in paths {
+                            let ap = path.trim().to_string();
 
-                    if Path::new(&ap).exists() {
-                        output.push((ap, true));
-                    } else {
-                        output.push((ap, false));
+                            if Path::new(&ap).exists() {
+                                output.push((ap, true));
+                            } else {
+                                output.push((ap, false));
+                            }
+                        }
+                        return Some(output);
+                    }
+                    None => {
+                        return None;
                     }
                 }
-                Some(output)
             } else {
                 None
             }
@@ -375,7 +387,7 @@ impl App {
                             PopupNotif {
                                 message: vec![("Added album to queue".to_string(), Color::White)],
                                 border_color: Color::Green,
-                                duration_ticks: Some(30),
+                                duration_ticks: Some(NOTIF_DURATION),
                                 title: "".to_string(),
                                 index: 1,
                             }
@@ -576,7 +588,7 @@ impl App {
                                 PopupNotif {
                                     message: vec![("Cleared the queue".to_string(), Color::White)],
                                     border_color: Color::Yellow,
-                                    duration_ticks: Some(30),
+                                    duration_ticks: Some(NOTIF_DURATION),
                                     title: "".to_string(),
                                     index: self.popup_notif.len() + 1,
                                 }

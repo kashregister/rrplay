@@ -1,7 +1,7 @@
 use crate::widgets::PopupNotif;
 
 use ratatui::{
-    prelude::{Alignment, Buffer, Rect, Stylize},
+    prelude::{Buffer, Rect, Stylize},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
@@ -20,7 +20,7 @@ impl Default for PopupNotif {
 
 impl Widget for PopupNotif {
     fn render(self, area: Rect, buf: &mut Buffer) -> () {
-        if let Some(ticks) = self.duration_ticks {
+        if let Some(_) = self.duration_ticks {
             let ratio = (4, 5);
             if self.index > ratio.1.into() {
                 return;
@@ -55,13 +55,13 @@ impl Widget for PopupNotif {
                 .block(help_block)
                 .wrap(Wrap { trim: false })
                 .render(popup_area, buf);
-            let mut hint_popup_area = popup_area;
-            hint_popup_area.y += popup_area.height - 1;
-            hint_popup_area.x += 1;
-
-            Paragraph::new(ticks.to_string())
-                .alignment(Alignment::Left)
-                .render(hint_popup_area, buf);
+            // let mut hint_popup_area = popup_area;
+            // hint_popup_area.y += popup_area.height - 1;
+            // hint_popup_area.x += 1;
+            //
+            // Paragraph::new(ticks.to_string())
+            //     .alignment(Alignment::Left)
+            //     .render(hint_popup_area, buf);
         }
     }
 }
