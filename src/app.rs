@@ -258,9 +258,6 @@ impl App {
                     AppEvent::Quit => self.quit(),
                     AppEvent::Search => {
                         self.mode = Mode::Search;
-                        // self.search_results = App::search_directory(String::from_str(
-                        //     "/mnt/disk_new/Music Library/Oliver Francis",
-                        // )?);
                     }
                     AppEvent::Select => {
                         if !self.search_results.is_empty() && self.mode == Mode::Search {

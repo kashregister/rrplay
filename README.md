@@ -36,7 +36,8 @@ V - Volume up\
 v - Volume down\
 c - Clear queue\
 h - move backwards 5s\
-l - move forward 5s
+l - move forward 5s\
+q - quit
 
 **Select mode:**\
 Enter - Add single to the queue\
