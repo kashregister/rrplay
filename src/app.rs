@@ -1,6 +1,5 @@
 use crate::event::{AppEvent, Event, EventHandler};
-use crate::widgets::PopupManual;
-use crate::widgets::PopupNotif;
+use crate::widgets::{PopupManual, PopupNotif};
 use crossterm::event::KeyEventKind;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use lofty::file::AudioFile;

@@ -1,11 +1,18 @@
-use crate::widgets::PopupNotif;
-
 use ratatui::{
     prelude::{Buffer, Rect, Stylize},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
 };
+
+#[derive(Clone)]
+pub struct PopupNotif {
+    pub message: Vec<(String, Color)>,
+    pub title: String,
+    pub border_color: Color,
+    pub duration_ticks: Option<usize>,
+    pub index: usize,
+}
 impl Default for PopupNotif {
     fn default() -> Self {
         PopupNotif {
