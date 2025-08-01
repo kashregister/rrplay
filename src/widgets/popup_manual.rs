@@ -1,4 +1,3 @@
-use crate::widgets::PopupManual;
 use ratatui::{
     prelude::{Alignment, Buffer, Rect, Stylize},
     style::{Color, Style},
@@ -6,6 +5,13 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 
+#[derive(Clone)]
+pub struct PopupManual {
+    pub message: Vec<(String, Color)>,
+    pub title: String,
+    pub bottom_hint: String,
+    pub border_color: Color,
+}
 impl Default for PopupManual {
     fn default() -> Self {
         PopupManual {
